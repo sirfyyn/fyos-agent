@@ -1,0 +1,15 @@
+{
+  "id": "fyos-prioritaet",
+  "name": "FYOS conversation priority",
+  "version": "2026.9.9",
+  "description": "Explicit assignment state for direct conversations and fifteen-minute capacity release.",
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "agenten": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" } }
+    },
+    "additionalProperties": false
+  },
+  "contracts": { "tools": ["fyos_conversation_status"] }
+}

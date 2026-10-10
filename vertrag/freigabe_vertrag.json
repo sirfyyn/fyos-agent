@@ -1,0 +1,75 @@
+{
+  "_zweck": "Der Freigabe-Vertrag: die EINE Wahrheit ueber eine Freigabe. Dienst und OpenClaw-Plugin lesen hier, nicht jede Seite ihre eigene. Er beschreibt die FORM, nicht die Erlaubnis.",
+  "_was_hier_nicht_steht": "Keine Rechte und kein Riegel. Die Grenze liegt UNTER dem Modell (Container-Rechte, Netz, Hub-Rechte), nicht in einer Liste.",
+
+  "kennung": {
+    "feld": "ticket",
+    "form": "^[A-Z]{2,6}-[1-9][0-9]*$",
+    "was": "Der Vorgang ist die eine Kennung. Jede Sicht findet denselben Gegenstand darunter.",
+    "bruecke": {
+      "feld": "approval_id",
+      "optional": true,
+      "was": "OpenClaws Handle auf DIESELBE Sache, wenn die Frage ueber OpenClaw kam. Nicht der Gegenstand selbst.",
+      "form": "uuid"
+    }
+  },
+
+  "antworten": {
+    "_was": "Eine Antwort ist nicht ja/nein. Der TEXT entscheidet, nicht die Flaeche.",
+    "genehmigen": {
+      "zielstatus": "in_progress",
+      "was": "Freigabe. Der Lauf geht weiter.",
+      "bedeutung": "Der Statuswechsel IST die Freigabe."
+    },
+    "ablehnen": {
+      "zielstatus": "triage",
+      "was": "Die Handlung laeuft nicht. Eine ALTERNATIVE soll gefunden werden.",
+      "nicht": "Nicht `closed`: eine abgelehnte Handlung heisst nicht, dass die Sache erledigt ist."
+    },
+    "keine": {
+      "zielstatus": null,
+      "was": "Kein Entscheidungswort. Kommentar am Vorgang, die Frage BLEIBT OFFEN.",
+      "bedeutung": "Fail-closed. Der gefaehrliche Ausgang ist die Genehmigung; im Zweifel passiert nichts."
+    }
+  },
+
+  "darstellung": {
+    "_was": "Eine Freigabe ist ein schneller Entscheidungsbrief, kein Logdump.",
+    "kurzbrief": ["wer", "was", "wo", "warum_und_umfang", "erwartete_wirkung"],
+    "technik": "Befehle, Diffs, Logs und Digests bleiben am Vorgang als nachschlagbarer Anhang. Sie duerfen die Kurzentscheidung nicht verdraengen.",
+    "prognose": "Die erwartete Wirkung benennt konkret, was nach einer Erteilung geschieht und was nicht erweitert wird. Ungewissheit wird sichtbar benannt, nie wegformuliert."
+  },
+
+  "uhren": {
+    "_was": "Drei Dinge werden getrennt getaktet: aktive Aufmerksamkeit, die fachliche Frage und die Sitzung. Keine Uhr darf aus einer ausbleibenden Antwort eine Ablehnung oder Zustimmung machen.",
+    "aktive_aufmerksamkeit_sekunden": 1800,
+    "aktive_aufmerksamkeit_was": "Die Freigabe wird 30 Minuten als aktive Aufmerksamkeit zugestellt. Danach endet nur diese hervorgehobene Zustellung; die offene Karte bleibt sichtbar und entscheidbar.",
+    "session_was": "Nach dem dauerhaften Anlegen der Frage endet der laufende Modellturn. Die gebundene Sitzung wartet logisch, belegt aber keinen Modellslot. Der Beschluss weckt ausschliesslich diese Sitzung fuer einen neuen Turn; ein verlorener Sitzungsbezug ist fail-closed und wird als Befund am Vorgang sichtbar.",
+    "frage_stunden": 72,
+    "frage_was": "Wie lange die FRAGE steht. Sie bleibt bis Entscheidung oder Frist offen.",
+    "token_stunden": 24,
+    "token_was": "Einmal-Token aus Kanal-Benachrichtigungen."
+  },
+
+  "stroeme": {
+    "_was": "Ein Ereignis, viele moegliche Leser.",
+    "_warum_drei": "`erteilt` heisst woertlich ERTEILT. Eine Ablehnung gehoert auf einen eigenen Strom, damit kein Leser aus ihr eine Wiederaufnahme ableitet.",
+    "angefragt": "fyos:events:freigabe.angefragt",
+    "erteilt": "fyos:events:freigabe.erteilt",
+    "abgelehnt": "fyos:events:freigabe.abgelehnt",
+    "maxlen": 1000
+  },
+
+  "form": {
+    "_was": "Die Felder, die jeder Kanal in Frage und Antwort tragen MUSS. Alles Text.",
+    "angefragt": ["ticket", "titel", "assignee", "waiting_for", "severity", "fingerabdruck", "beschreibung", "ts"],
+    "erteilt": ["ticket", "fingerabdruck", "titel", "assignee", "ts"],
+    "abgelehnt": ["ticket", "fingerabdruck", "titel", "assignee", "ts"],
+    "grenzen": {
+      "titel": 200,
+      "waiting_for": 200,
+      "fingerabdruck": 200,
+      "beschreibung": 1500
+    }
+  }
+}

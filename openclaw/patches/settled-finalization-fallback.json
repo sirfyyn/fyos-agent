@@ -1,0 +1,23 @@
+{
+  "upstream": "openclaw-2026.9.7",
+  "targets": [
+    {
+      "file": "dist/embedded-agent-BVEibI5N.mjs",
+      "before": "8833536106066a31129fa6a9048a929cb572743f3a3729c836bae1a0b67c9b88",
+      "after": "036c54762c2467b5720a5c4f0e4b52c6ccffa837a6bc77860050f54a441ffc21",
+      "replacement": {
+        "before": "const SETTLED_TOOL_FINALIZATION_FALLBACK_TEXT = \"The tool run finished, but no final summary was produced. I did not repeat any completed actions.\";",
+        "after": "const SETTLED_TOOL_FINALIZATION_FALLBACK_TEXT = \"Der Werkzeuglauf ist abgeschlossen, aber der Abschlussbericht konnte wegen eines Modell- oder Gateway-Fehlers nicht erzeugt werden. Bereits ausgefuehrte Wirkungen wurden nicht wiederholt; Details stehen im Arbeitsverlauf.\";"
+      }
+    },
+    {
+      "file": "dist/package-update-activation-recovery.mjs",
+      "before": "71c511006ae72da228680f3421a58549548140f2b92337a552b60a9ff2a5fb48",
+      "after": "446deb4fc95ce55ecadc3c140de11370397960420bc61de288b7238e27622a6d",
+      "replacement": {
+        "before": "\tSETTLED_TOOL_FINALIZATION_FALLBACK_TEXT = \"The tool run finished, but no final summary was produced. I did not repeat any completed actions.\";",
+        "after": "\tSETTLED_TOOL_FINALIZATION_FALLBACK_TEXT = \"Der Werkzeuglauf ist abgeschlossen, aber der Abschlussbericht konnte wegen eines Modell- oder Gateway-Fehlers nicht erzeugt werden. Bereits ausgefuehrte Wirkungen wurden nicht wiederholt; Details stehen im Arbeitsverlauf.\";"
+      }
+    }
+  ]
+}

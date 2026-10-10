@@ -1,0 +1,11 @@
+# Pfad-Präfixe, die tools/sauber.py überspringt (eine Zeile je Präfix, Kommentare nur in eigenen Zeilen).
+# Die Urheberzeile der Lizenz nennt ein Konto, das sonst als verboten gilt. Wo sie steht und kein Kommentar
+# "sauber: ok" möglich ist (NOTICE hat ein festes Format, JSON kennt keine Kommentare), gilt die Ausnahme für die Datei.
+NOTICE
+plugins/fyos-bruecke/package.json
+plugins/fyos-ersteinrichtung/package.json
+plugins/fyos-freigabe-chat/package.json
+plugins/fyos-kontext-edit/package.json
+plugins/fyos-meldebudget/package.json
+plugins/fyos-prioritaet/package.json
+plugins/fyos-speed-router/package.json

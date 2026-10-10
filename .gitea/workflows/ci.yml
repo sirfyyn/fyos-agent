@@ -1,0 +1,64 @@
+# Prüfen bei jedem Push, Bild bauen auf main.
+# Repo-Variablen: FYOS_RUNNER, FYOS_REGISTRY, optional FYOS_REGISTRY_HOSTS.
+# Anmeldung an der Registry: Secrets REGISTRY_USER/REGISTRY_TOKEN (Token mit write:package; Gitea gibt dem
+# Laufzeit-Token GITEA_TOKEN keine Paketrechte). Fehlen sie, versucht der Lauf das Laufzeit-Token (packages: write).
+name: ci
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ gitea.workflow }}-${{ gitea.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pruefen:
+    runs-on: ${{ vars.FYOS_RUNNER }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sauberkeit
+        run: python3 tools/sauber.py .
+      - name: Render-Tests
+        run: |
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install -q pytest pyyaml
+          /tmp/venv/bin/python -m pytest tests -q
+      - name: Plugin-Tests
+        run: node --test "plugins/**/*.test.mjs"
+
+  bauen:
+    needs: pruefen
+    if: gitea.ref == 'refs/heads/main' && gitea.event_name == 'push'
+    runs-on: ${{ vars.FYOS_RUNNER }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+      - name: Anmelden
+        run: |
+          host="${FYOS_REGISTRY%%/*}"
+          printf '%s' "$REGISTRY_TOKEN" | docker login "$host" -u "$REGISTRY_USER" --password-stdin
+        env:
+          FYOS_REGISTRY: ${{ vars.FYOS_REGISTRY }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER || gitea.actor }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GITEA_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: openclaw/Dockerfile
+          add-hosts: ${{ vars.FYOS_REGISTRY_HOSTS }}
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ vars.FYOS_REGISTRY }}/fyos-agent/openclaw:main
+            ${{ vars.FYOS_REGISTRY }}/fyos-agent/openclaw:${{ gitea.sha }}
+      - name: Upstream-Einstieg im Bild prüfen
+        run: |
+          bild="${{ vars.FYOS_REGISTRY }}/fyos-agent/openclaw:${{ gitea.sha }}"
+          docker run --rm --entrypoint sh "$bild" -c 'command -v tini && command -v openclaw && ls /app | head -50 && python3 -c "import yaml"'

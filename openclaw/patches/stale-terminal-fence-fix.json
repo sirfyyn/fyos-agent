@@ -1,0 +1,23 @@
+{
+  "upstream": "openclaw-2026.9.7",
+  "targets": [
+    {
+      "file": "dist/restart-recovery-receipt-C1LMd5lE.mjs",
+      "before": "d243c56332c076c5a0e20668fea25727ba575111115a31da99eb1416d5439d0e",
+      "after": "cd0d2e837ed20b968e64d8d45313c9dba8b495d15eae1ee677113fc2ef43097b",
+      "replacement": {
+        "before": "\tif (disposition === \"not-applicable\") {\n\t\tif (normalizedSourceTurnId === \"\" && (normalizeRestartRecoveryTerminalRunIds(entry.restartRecoveryTerminalRunIds)?.length ?? 0) > 0) return \"unknown-source-with-terminal-history\";\n\t\treturn hasRestartRecoveryTerminalRun(entry, normalizedSourceTurnId) ? \"already-delivered\" : void 0;\n\t}",
+        "after": "\t// FYOS: historical terminal markers are provenance once no delivery claim\n\t// exists; they must not freeze later direct-chat input after a completed turn.\n\tif (disposition === \"not-applicable\") return void 0;"
+      }
+    },
+    {
+      "file": "dist/package-update-activation-recovery.mjs",
+      "before": "446deb4fc95ce55ecadc3c140de11370397960420bc61de288b7238e27622a6d",
+      "after": "611156f782acf74d9d659a36f13f46de3d424cbf1eb8ab5b9c6274ee72b6977e",
+      "replacement": {
+        "before": "\tif (disposition === \"not-applicable\") {\n\t\tif (normalizedSourceTurnId === \"\" && (normalizeRestartRecoveryTerminalRunIds(entry.restartRecoveryTerminalRunIds)?.length ?? 0) > 0) return \"unknown-source-with-terminal-history\";\n\t\treturn hasRestartRecoveryTerminalRun(entry, normalizedSourceTurnId) ? \"already-delivered\" : void 0;\n\t}",
+        "after": "\t// FYOS: historical terminal markers are provenance once no delivery claim\n\t// exists; they must not freeze later direct-chat input after a completed turn.\n\tif (disposition === \"not-applicable\") return void 0;"
+      }
+    }
+  ]
+}

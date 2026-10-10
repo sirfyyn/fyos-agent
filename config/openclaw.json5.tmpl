@@ -1,0 +1,313 @@
+{
+  // Gerendert aus config/openclaw.json5.tmpl und fyos.yaml (fyos_agent/render.py).
+  // Alle Schlüssel stammen aus der laufenden Referenzkonfiguration; Geheimnisse bleiben
+  // als ${VARIABLE} stehen und werden vom Gateway aus der Umgebung gelesen.
+
+  // Ohne `meta` verwirft OpenClaw eine Vorlage und stellt die letzte gute Fassung wieder her.
+  meta: { lastTouchedVersion: "2026.9.7", migrations: { modelPolicyAllowlist: true } },
+
+  gateway: {
+    mode: "local",
+    // Das Gateway lauscht im Container-Netz; die Shell (nginx) reicht /agent unverändert
+    // durch. Erreichbar machen nur Compose/Kubernetes-Netz, kein Port nach aussen.
+    bind: "lan",
+    port: 18789,
+    auth: { mode: "token", token: "${OPENCLAW_GATEWAY_TOKEN}" },
+{{#if gateway.oeffentlicher_ursprung}}
+    // Nur https (http nur auf localhost), sonst lehnt OpenClaw die Konfiguration ab; render.py prüft das.
+    publicOrigin: {{json gateway.oeffentlicher_ursprung}},
+{{/if}}
+    controlUi: { basePath: "/agent", allowedOrigins: {{json gateway.alle_urspruenge}} },
+    // Herkunftsangaben eines Vorsatzes glaubt das Gateway nur, wenn er benannt ist.
+    trustedProxies: {{json gateway.vertrauenswuerdige_proxys}},
+  },
+
+  models: {
+    mode: "merge",
+    catalogRefresh: { enabled: false },
+    providers: {
+      modell: {
+        baseUrl: "{{env.FYOS_MODELL_BASIS_URL}}",
+        apiKey: "${FYOS_MODELL_SCHLUESSEL}",
+        api: "openai-completions",
+        timeoutSeconds: {{json modell.zeitlimit_s}},
+        models: [
+          {
+            id: "{{env.FYOS_MODELL_NAME}}",
+            name: "{{env.FYOS_MODELL_NAME}}",
+            contextWindow: {{json modell.kontext}},
+            maxTokens: {{json modell.max_tokens}},
+            input: {{#if modell.bilder}}["text", "image"]{{/if}}{{#unless modell.bilder}}["text"]{{/unless}},
+            reasoning: {{json modell.denken}},
+            compat: { supportsTools: true },
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          },
+        ],
+      },
+    },
+  },
+
+  agents: {
+    defaults: {
+      // Alte Werkzeugergebnisse fallen nach Leerlauf aus dem Modellkontext; die Akte bleibt.
+      contextPruning: { mode: "cache-ttl", ttl: "5m" },
+      // Kontext bei Bedarf statt beim Start.
+      startupContext: { enabled: false },
+{{#if ersteinrichtung.offen}}
+      // Die Ersteinrichtung führt der Agent selbst (BOOTSTRAP.md, Werkzeug fyos_ersteinrichtung): OpenClaw soll
+      // seine eigenen Starter-Dateien weder anlegen noch die Einrichtung von sich aus als erledigt vermerken.
+      // Vorhandene Dateien (auch BOOTSTRAP.md) fließen weiter in den Kontext; solange die Datei da ist, ist die
+      // Einrichtung offen. Nach dem Abschluss fehlt dieser Schlüssel beim nächsten Start.
+      skipBootstrap: true,
+{{/if}}
+      compaction: {
+        enabled: true,
+        mode: "safeguard",
+        thinkingLevel: "off",
+        recentTurnsPreserve: 3,
+        qualityGuard: { enabled: true, maxRetries: 3 },
+        midTurnPrecheck: { enabled: true },
+        keepRecentTokens: 8000,
+        notifyUser: true,
+      },
+      systemAgent: { agentId: "{{agent.id}}" },
+      // Kein Zeitimpuls erfindet Arbeit: Heartbeat aus.
+      heartbeat: { every: "0m" },
+      maxConcurrent: 2,
+      subagents: { maxConcurrent: 1, delegationMode: "suggest" },
+      typingMode: "instant",
+    },
+    ownership: "explicit",
+    entries: {
+      "{{agent.id}}": {
+        model: "modell/{{env.FYOS_MODELL_NAME}}",
+        workspace: "/home/node/.openclaw/workspace",
+        memory: { search: { rememberAcrossConversations: true } },
+{{#if modell.denken}}
+        thinkingDefault: "low",
+{{/if}}
+        typingMode: "instant",
+        tools: {
+          profile: "minimal",
+          alsoAllow: [
+            "read", "memory_search", "memory_get", "ask_user", "session_status",
+            "fyos*", "mcp*", "hub*", "message", "web_fetch",
+{{#if kopplung.workboard}}
+            // Arbeitsliste ohne Worker-Protokoll (kein claim, dispatch, complete).
+            "workboard_list", "workboard_read", "workboard_boards", "workboard_create", "workboard_comment", "workboard_move",
+{{/if}}
+{{#if faehigkeiten.shell}}
+            "exec", "process",
+{{/if}}
+{{#if faehigkeiten.browser}}
+            "browser",
+{{/if}}
+          ],
+          deny: ["computer", "openclaw", "sessions_yield"],
+{{#if faehigkeiten.shell}}
+          // Die Grenze liegt unter dem Modell (Container-Rechte, Netz, Hub-Rechte), nicht in einer Liste.
+          exec: { security: "full", ask: "off" },
+{{/if}}
+        },
+      },
+    },
+  },
+  talk: { agentId: "{{agent.id}}" },
+{{#if kanaele_aktiv}}
+  // Mit agents.ownership "explicit" braucht jeder Kanal eine Bindung an den Agenten.
+  bindings: [
+{{#if kanaele.matrix}}
+    { agentId: "{{agent.id}}", match: { channel: "matrix", accountId: "default" } },
+{{/if}}
+{{#if kanaele.telegram}}
+    { agentId: "{{agent.id}}", match: { channel: "telegram", accountId: "default" } },
+{{/if}}
+  ],
+{{/if}}
+
+  tools: {
+    toolSearch: { enabled: true, mode: "directory", searchDefaultLimit: 3, maxSearchLimit: 5 },
+    codeMode: false,
+    // Werkzeug-Schleifen erkennen, bevor sie Zeit und Geld kosten.
+    loopDetection: { enabled: true },
+    web: { fetch: { enabled: true } },
+  },
+
+{{#if kanaele_aktiv}}
+  channels: {
+{{#if kanaele.matrix}}
+    matrix: {
+      enabled: true,
+      homeserver: "{{env.FYOS_MATRIX_HOMESERVER}}",
+      userId: "{{env.FYOS_MATRIX_BENUTZER}}",
+      accessToken: "${OPENCLAW_MATRIX_TOKEN}",
+      deviceName: "fyos-agent",
+      encryption: false,
+      dm: { policy: "allowlist", allowFrom: [{{json besitzer.matrix_id}}] },
+      groupPolicy: "allowlist",
+      groupAllowFrom: [{{json besitzer.matrix_id}}],
+      autoJoin: "off",
+      streaming: { mode: "progress", progress: { toolProgress: false } },
+    },
+{{/if}}
+{{#if kanaele.telegram}}
+    // Telegram steckt im Basisbild von OpenClaw. Nur Direktnachrichten des Besitzers (numerische ID aus der
+    // Umgebung); Gruppen sind aus, und der Kanal darf die Konfiguration nicht schreiben.
+    telegram: {
+      enabled: true,
+      botToken: "${OPENCLAW_TELEGRAM_TOKEN}",
+      dmPolicy: "allowlist",
+      allowFrom: [{{json besitzer.telegram_id}}],
+      groupPolicy: "disabled",
+      configWrites: false,
+      // Freigabe-Knöpfe nur in Direktnachrichten.
+      capabilities: { inlineButtons: "dm" },
+    },
+{{/if}}
+  },
+{{/if}}
+
+  mcp: {
+    servers: {
+      hub: {
+        transport: "streamable-http",
+        url: "{{env.FYOS_HUB_URL}}",
+        enabled: true,
+        requestTimeoutMs: 45000,
+        // Reine Zuordnung im Audit des Hubs, keine Berechtigung.
+        headers: { "X-Hub-Caller": "{{agent.id}}" },
+      },
+    },
+  },
+
+  logging: { level: "info", consoleLevel: "info", maxFileBytes: 20971520,
+             file: "/home/node/.openclaw/logs/openclaw.log",
+             audit: { enabled: true, messages: "off" } },
+  transcripts: { enabled: true },
+  attachments: { ttlHours: 168 },
+
+  // Das Bild ist per Digest festgenagelt und wird von FYOS ausgerollt: kein Selbst-Update,
+  // keine Telemetrie, keine Netzsuche im LAN.
+  update: { channel: "stable", checkOnStart: false, auto: { enabled: false } },
+  telemetry: { enabled: false, consentedAt: "2026-01-01T00:00:00.000Z" },
+  discovery: { mdns: { mode: "off" } },
+  acp: { enabled: false },
+  nodeHost: { workerRuns: { enabled: false } },
+  env: { shellEnv: { enabled: false } },
+  diagnostics: { enabled: true, otel: { enabled: false }, cacheTrace: { enabled: false } },
+
+  session: {
+    scope: "per-sender",
+    dmScope: "main",
+    groupScope: "per-group",
+    reset: { mode: "none" },
+    maintenance: { mode: "enforce", pruneAfter: "30d", archiveDashboardAfter: "7d", maxEntries: 5000, preserveRecent: "7d", maxDiskBytes: "2gb" },
+  },
+
+  // Chat-Befehle: keine Host-Shell, keine Konfig-Schreibvorgänge, keine Debug-Overrides.
+  commands: {
+    native: "auto", nativeSkills: "auto", text: true,
+    bash: false, config: false, mcp: false, plugins: false, debug: false, restart: true,
+{{#if besitzer.owner_ids}}
+    ownerAllowFrom: {{json besitzer.owner_ids}},
+{{/if}}
+  },
+
+  skills: {
+    // Skills aus fyos-agent (betriebskonzept, freigabe), auf die AGENTS.md verweist; niedrigster Vorrang,
+    // eigene Skills gleichen Namens gewinnen.
+    load: { extraDirs: ["/opt/fyos/skills"] },
+    install: { preferBrew: false, nodeManager: "npm", allowUploadedArchives: false },
+    workshop: { autonomous: { mode: "propose" } },
+  },
+{{#if kanaele_aktiv}}
+  approvals: {
+    exec: { enabled: false },
+    plugin: { enabled: true, mode: "both", targets: [
+{{#if kanaele.matrix}}
+      { channel: "matrix", to: {{json besitzer.matrix_id}} },
+{{/if}}
+{{#if kanaele.telegram}}
+      { channel: "telegram", to: {{json besitzer.telegram_id}} },
+{{/if}}
+    ] },
+  },
+{{/if}}
+  hooks: { enabled: false },
+  tts: { auto: "off" },
+  ui: { prefs: { locale: "{{sprache_code}}" } },
+
+  plugins: {
+    // Jeder Eintrag in load.paths muss im Bild existieren, sonst startet das Gateway nicht.
+    load: { paths: {{json plugin_pfade}} },
+{{#if kontext_edit.aktiv}}
+    slots: { contextEngine: "fyos-kontext-edit" },
+{{/if}}
+    entries: {
+{{#if kanaele.matrix}}
+      matrix: { enabled: true },
+{{/if}}
+{{#if kanaele.telegram}}
+      telegram: { enabled: true },
+{{/if}}
+      "fyos-prioritaet": {
+        enabled: true,
+        hooks: { allowConversationAccess: true, allowPromptInjection: false },
+        config: { agenten: {{json prioritaet.agenten}} },
+      },
+      // Antwort im Chat entscheidet eine offene Freigabe, ohne Modellaufruf. Nur mit Vorgangs-Dienst.
+      "fyos-freigabe-chat": {
+        enabled: {{json faehigkeiten.vorgaenge}},
+        hooks: { allowConversationAccess: true, allowPromptInjection: false },
+      },
+{{#if kopplung.workboard}}
+      // Workboard (mitgeliefert, von Haus aus aus): Arbeitsliste des Agenten und Gegenstück der FYOS-Vorgänge.
+      workboard: { enabled: true },
+{{/if}}
+      // Kopplung an den Hub (fyos-os: docs/KOPPLUNG-OPENCLAW.md): Ereignisse ohne Inhalte hin, Abfragen her.
+      "fyos-bruecke": {
+        enabled: {{json kopplung.aktiv}},
+        hooks: { allowConversationAccess: false, allowPromptInjection: false },
+{{#if kopplung.hub_url}}
+        config: { hubUrl: {{json kopplung.hub_url}} },
+{{/if}}
+      },
+      // Ersteinrichtung als Gespräch: das Werkzeug, mit dem der Agent USER.md und IDENTITY.md füllt. Nur an,
+      // solange die Einrichtung offen ist; ohne Einblick ins Gespräch und ohne Prompt-Recht.
+      "fyos-ersteinrichtung": {
+        enabled: {{json ersteinrichtung.offen}},
+        hooks: { allowConversationAccess: false, allowPromptInjection: false },
+      },
+      "fyos-meldebudget": {
+        enabled: true,
+        hooks: { allowConversationAccess: true, allowPromptInjection: false },
+        config: {
+          tagesbudget: {{json meldebudget.tagesbudget}},
+          ruheVon: {{json meldebudget.ruhe_von}},
+          ruheBis: {{json meldebudget.ruhe_bis}},
+          zeitzone: {{json zeitzone}},
+          antwortFensterMinuten: {{json meldebudget.antwort_fenster_minuten}},
+          buendelMinuten: {{json meldebudget.buendel_minuten}},
+        },
+      },
+      "fyos-kontext-edit": {
+        enabled: {{json kontext_edit.aktiv}},
+        config: { aktiv: {{json kontext_edit.aktiv}} },
+      },
+      "fyos-speed-router": {
+        enabled: {{json tempo_router.aktiv}},
+        hooks: { allowConversationAccess: true, allowPromptInjection: true },
+        config: {
+          enabled: {{json tempo_router.aktiv}},
+          targetModel: {{json tempo_router.ziel_modell}},
+          maxChars: {{json tempo_router.max_zeichen}},
+          agentId: "{{agent.id}}",
+        },
+      },
+      // Zusatz-Plugins aus $FYOS_AGENT_PLUGINS (Vorgabe /opt/fyos-extra), Einstellungen aus zusatz_plugins.
+{{#each zusatz_eintraege}}
+      {{.}}
+{{/each}}
+    },
+  },
+}

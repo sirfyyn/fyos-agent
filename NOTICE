@@ -1,0 +1,11 @@
+FYOS Agent
+Copyright 2026 sirfyyn and FYOS CONTRIBUTORS
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product is built on OpenClaw (https://github.com/openclaw/openclaw), which is
+licensed under the MIT License, Copyright (c) 2026 OpenClaw Foundation. The container
+image is based on the upstream OpenClaw image, and openclaw/patches/ contains short
+excerpts of upstream code (the strings that the hash-checked build-time patches search
+for). Those excerpts and OpenClaw itself remain under the MIT License; its text is in
+the LICENSE file of the OpenClaw repository.

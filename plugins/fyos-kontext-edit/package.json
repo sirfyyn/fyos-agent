@@ -1,0 +1,10 @@
+{
+  "name": "@fyos/kontext-edit",
+  "version": "2026.10.6",
+  "private": true,
+  "license": "Apache-2.0",
+  "author": "sirfyyn and FYOS CONTRIBUTORS",
+  "type": "module",
+  "openclaw": { "extensions": ["./index.mjs"] },
+  "scripts": { "test": "node --test *.test.mjs" }
+}

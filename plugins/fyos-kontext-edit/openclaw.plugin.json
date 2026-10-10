@@ -1,0 +1,44 @@
+{
+  "id": "fyos-kontext-edit",
+  "name": "FYOS Kontext-Edit",
+  "version": "2026.10.6",
+  "kind": "context-engine",
+  "description": "Experiment: the agent deletes or condenses its own earlier tool results (Context Language Models); A/B against compaction. Off unless aktiv=true and plugins.slots.contextEngine selects it.",
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": ["kontext_bearbeiten"]
+  },
+  "toolMetadata": {
+    "kontext_bearbeiten": {
+      "optional": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "aktiv": {
+        "type": "boolean"
+      },
+      "editAnteil": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "protokoll": {
+        "type": "string"
+      },
+      "auftragAb": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "budget": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "additionalProperties": false
+  }
+}

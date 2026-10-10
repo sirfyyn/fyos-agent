@@ -1,0 +1,81 @@
+# Beispielkonfiguration für fyos-agent. Kopieren, anpassen, per FYOS_CONFIG einbinden.
+# Alles Fehlende füllen die Vorgaben aus fyos_agent/render.py.
+# Geheimnisse (Modell-Schlüssel, Gateway-Token) stehen NICHT hier, sondern in der Umgebung.
+
+agent:
+  id: main                 # technische Kennung des Agenten im Gateway
+  name: Fy                 # Anzeigename
+  wesen: ruhig, präzise, direkt und zugewandt
+  rolle: Persönlicher Agent für FYOS
+
+besitzer:
+  name: Alex
+  matrix_id: ""            # z. B. "@alex:matrix.example.com"; leer = ohne Matrix-Freigaben
+
+sprache: Deutsch
+sprache_code: de
+zeitzone: Europe/Berlin
+
+# Was der Agent nie allein entscheidet. Erscheint in AGENTS.md als Liste „schwer“.
+grenzen:
+  schwer:
+    - Neue Fähigkeit oder spürbar anderes Verhalten des Agenten
+    - Löschen und nicht umkehrbare Datenänderungen
+    - Geld, Zahlungen, neue Konten bei Fremddiensten
+    - Systemeinstellungen, Netz, Firewall, Anmelde-Richtlinien
+    - Anmeldedaten, Tokens, Schlüssel
+    - Kernel, Treiber, Firmware, Major-Updates
+    - Etwas veröffentlichen
+    - Neue Hardware
+    - Privatsphäre-relevante Änderungen
+
+faehigkeiten:
+  vorgaenge: false         # true: Vorgangs-Dienst vorhanden (Freigabe im Chat, Vorgangs-Abschnitt)
+  shell: false             # true: Agent darf Shell-Befehle ausführen (exec/process)
+  browser: false
+  ersteinrichtung: true    # true: beim allerersten Gespräch einer frischen Installation interviewt der Agent den
+                           # Besitzer (Anrede, Sprache, Zeitzone, Zweck, Grenzen, Agentenname) und füllt USER.md
+                           # und IDENTITY.md; danach nie wieder. false: aus, die Dateien kommen aus dieser Datei
+
+meldebudget:
+  tagesbudget: 5           # proaktive Meldungen pro Tag
+  ruhe_von: "22:00"
+  ruhe_bis: "07:00"
+
+modell:                    # Verbindung selbst kommt aus FYOS_MODELL_* (Umgebung)
+  kontext: 131072
+  max_tokens: 16384
+  denken: false            # true: Reasoning-Modell
+  bilder: false            # true: Modell nimmt Bilder an
+
+kanaele:
+  matrix: false            # true: FYOS_MATRIX_HOMESERVER, FYOS_MATRIX_BENUTZER, OPENCLAW_MATRIX_TOKEN setzen
+  telegram: false          # true: OPENCLAW_TELEGRAM_TOKEN und FYOS_APPROVER_TELEGRAM_ID (Besitzer) setzen; nur Direktnachrichten
+
+gateway:
+  oeffentliche_url: ""     # z. B. "https://fyos.example.com"; leer: $FYOS_OEFFENTLICH_URL
+  erlaubte_urspruenge: []
+  vertrauenswuerdige_proxys: ["127.0.0.1/32"]   # nur Vorsätze, die X-Forwarded-For überschreiben (die Shell streicht ihn)
+
+kontext_edit:
+  aktiv: false             # Experiment: Agent bereinigt eigene Werkzeugergebnisse
+tempo_router:
+  aktiv: false             # nur mit ziel_modell, z. B. "modell/klein"
+  ziel_modell: ""
+prioritaet:
+  agenten: [main]          # Agenten-IDs, deren Gespräche den Abschluss-Status melden
+
+# Kopplung an den Hub (fyos-os: docs/KOPPLUNG-OPENCLAW.md)
+kopplung:
+  aktiv: true              # fyos-bruecke: Ereignisse ohne Inhalte an den Hub, Abfragen vom Hub
+  hub_url: ""              # leer: aus FYOS_HUB_URL ohne /mcp, z. B. http://hub:8080
+  workboard: true          # OpenClaw-Workboard an; der Agent liest, legt an, kommentiert, verschiebt Karten
+
+# Zusatz-Plugins ohne Fork: jeder Ordner mit openclaw.plugin.json unter /opt/fyos-extra
+# (oder $FYOS_AGENT_PLUGINS) wird geladen, ohne Einblick ins Gespräch und ohne Prompt-Recht.
+# Hier je Plugin-ID ein- und ausschalten, Rechte geben und Einstellungen setzen.
+zusatz_plugins: {}
+#  mein-zaehler:
+#    aktiv: true
+#    rechte: {gespraech: false, prompt: false}
+#    config: {grenze: 3}

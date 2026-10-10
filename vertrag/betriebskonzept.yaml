@@ -1,0 +1,146 @@
+# Betriebskonzept „Kleines hat Go, Schweres entscheidet der Besitzer“ als prüfbare Regel.
+# Prosa: vertrag/betriebskonzept.md. Hier steht, woran ein Text (Vorgang, Befund) oder eine
+# Dateiliste als SCHWER erkannt wird.
+#
+# Grundsatz: alles ohne Treffer ist KLEIN; ein einziger Treffer macht es SCHWER (dann
+# entscheidet der Besitzer). Die Regeln sind absichtlich weit gefasst: ein Fehlalarm kostet
+# eine Entscheidung, ein Fehlgriff kostet mehr.
+#
+# Jede Regel: kategorie (Name für Berichte), satz (warum das dem Besitzer gehört), muster
+# (Regex, ohne Groß-/Kleinschreibung, gegen den Text). `dateien` gelten gegen Repo-Pfade.
+# `klein_beispiele` und `schwer_beispiele` sind Prüfstücke: ein Test stellt sicher, dass sie so
+# eingestuft werden; wer eine Regel ändert, sieht sofort, was sich verschiebt.
+#
+# Anpassen: eigene Kategorien oder Muster ergänzen, nicht still entfernen. Ein Eintrag in
+# `grenzen.schwer` der fyos.yaml ist die menschenlesbare Fassung derselben Regel.
+
+schwer:
+  - kategorie: neue_faehigkeit
+    satz: Neue Fähigkeit oder spürbar anderes Verhalten des Agenten.
+    muster:
+      - 'neue[nrsm]?\s+(fähigkeit|funktion|werkzeug|feature|schleife|automatik|skill|app|fläche)'
+      - 'neues?\s+verhalten'
+      - 'verhalten\s+(des|der|von)\s+\w+\s+(änder|umstell|anpass)'
+      - 'agent\s+soll\s+(künftig|zukünftig|jetzt|ab\s+sofort|von\s+selbst)'
+      - 'spürbar\s+anders'
+  - kategorie: major_update
+    satz: Major-Update (Hauptversion springt).
+    muster:
+      - 'major[- ]?(update|upgrade|version|release|sprung|bump)'
+      - '\bmajor\b'
+  - kategorie: kernel_treiber
+    satz: Kernel, Treiber, Firmware oder Boot-Software.
+    muster:
+      - '\bkernel\b'
+      - 'treiber|\bdriver\b'
+      - 'firmware|\bbios\b|\buefi\b|\bgrub\b|initramfs'
+  - kategorie: privatsphaere
+    satz: Privatsphäre, Datenschutz oder Kameras auf Personen.
+    muster:
+      - 'privatsph|datenschutz|\bdsgvo\b'
+      - 'kamera\w*.{0,40}(person|mensch|gesicht)'
+      - '(person|mensch|gesicht)\w*.{0,40}kamera'
+      - 'gesichts?erkennung|personen[- ]?erkennung|face[- ]?recogni'
+      - 'standortdaten|bewegungsprofil'
+  - kategorie: veroeffentlichen
+    satz: Etwas veröffentlichen (öffentlich machen).
+    muster:
+      - 'veröffentlich'
+      - '\bpublish'
+      - 'öffentlich\s+(machen|stellen|freigeben|zugänglich)'
+      - 'open[- ]?source\s+(stellen|machen|geben)'
+  - kategorie: geld_konten
+    satz: Geld, Zahlungen oder neue Konten bei Fremddiensten.
+    muster:
+      - '\bgeld\b|zahlung|bezahl|\brechnungen?\b|kreditkarte|\bpaypal\b|\bbank\b|überweis'
+      - '€|\beuro\b'
+      - 'abo\b|abonnement|\bkaufen\b|\bbestellen\b'
+      - 'neues?\s+konto|neue\s+konten|konto\s+(anlegen|erstellen|eröffnen)|account\s+(anlegen|erstellen)'
+      - 'registrier\w+\s+bei'
+  - kategorie: hardware
+    satz: Neue Hardware.
+    muster:
+      - 'neue[nrsm]?\s+(hardware|gpu|grafikkarte|server|festplatte|ssd|nas|switch|rechner|netzteil)'
+      - 'anschaff'
+      - 'hardware[- ]?(kauf|ersatz|tausch)'
+  - kategorie: loeschen
+    satz: Löschen oder nicht umkehrbare Datenänderung.
+    muster:
+      - 'lösch|loesch|\bdelete\b|\bdrop\b|truncate|rm\s+-rf|vernicht|unwiderruflich|irreversibel'
+      - 'force[- ]?push|push\s+(--force|-f\b)|--force-with-lease|history[- ]?rewrite|git\s+filter|historie\s+umschreib'
+      - '(pvc|volume|dataset|pool).{0,30}(entfern|abbauen|zerstör)'
+  - kategorie: system_netz
+    satz: Systemeinstellung, Netz, Firewall oder Anmelde-Richtlinie.
+    muster:
+      - 'firewall|\bvlan\b|\bsysctl\b|/etc/|\bfstab\b'
+      - 'netzwerk[- ]?(konfig|änder|umbau)'
+      - '(sso|oidc|anmeldung).{0,40}(richtlinie|policy|flow|provider)'
+      - 'systemeinstellung|system[- ]?konfiguration'
+      - '\bnetpol\b|network[- ]?polic'
+  - kategorie: anmeldedaten
+    satz: Anmeldedaten, Tokens, Schlüssel oder Logins.
+    muster:
+      - 'passwort|passwörter|kennwort|password|passphrase'
+      - '\btokens?\b|\bsecrets?\b|api[- ]?key|api[- ]?schlüssel|credential|anmeldedaten|zugangsdaten'
+      - '\blogins?\b|ssh[- ]?key|private[rn]?\s+schlüssel'
+
+# Repo-Pfade, die allein schon SCHWER machen (auch wenn der Text harmlos klingt).
+dateien:
+  - kategorie: anmeldedaten
+    satz: Datei mit Anmeldedaten oder Schlüsseln.
+    muster:
+      - '(^|/)\.env(\.|$)'
+      - '(^|/)(secrets?|credentials?|sealed[-_]?secrets?)([-_.]|/|$)'
+      - '\.(pem|key|p12|pfx)$'
+  - kategorie: privatsphaere
+    satz: Datei zu Privatsphäre, Datenschutz oder Kameras.
+    muster:
+      - 'privacy|privatsph|datenschutz'
+      - '(^|/)(frigate|kamera|camera)([-_.]|/|$)'
+  - kategorie: agentenverhalten
+    satz: Datei, die das Verhalten des Agenten bestimmt (Anweisungen, Konfiguration, Seele).
+    muster:
+      - '(^|/)(AGENTS|SOUL|IDENTITY|USER)\.md(\.tmpl)?$'
+      - '(^|/)openclaw\.json5?(\.tmpl)?$'
+      - '(^|/)fyos\.ya?ml$'
+      - '^plugins/fyos-meldebudget/'
+      - '^vertrag/'
+  - kategorie: system_netz
+    satz: Datei zu Netz, Firewall, Anmeldung oder Ingress.
+    muster:
+      - 'netpol|network[-_]?polic|firewall'
+      - '(^|/)(oidc|sso|ingress|caddy|nginx)'
+  - kategorie: kernel_treiber
+    satz: Datei zu Kernel, Treibern oder Firmware.
+    muster:
+      - 'kernel|nvidia[-_]?(treiber|driver)|firmware'
+  - kategorie: geld_konten
+    satz: Datei zu Geld oder Konten bei Fremddiensten.
+    muster:
+      - '(^|/)(finanz|finance|konten|bestellungen|paypal)[^/]*\.py$'
+
+# Prüfstücke (siehe Kopf). Kleines: Fehlerbehebungen, Kleinkram aus Rundgängen, Patch- und
+# Minor-Updates mit Rückweg, Rebase, Backup-Prüfung, Log-Auswertung, Alarmschwellen, Tests, Doku.
+klein_beispiele:
+  - 'Test test_zeit.py::test_dauer rot: AssertionError in der Zeitberechnung'
+  - 'Pod frontend-probe im CrashLoopBackOff, Neustart nach Konfig-Tippfehler'
+  - 'Patch-Update 1.4.2 auf 1.4.3 von httpx mit Rückweg'
+  - 'Minor-Update 2.3.1 auf 2.4.0 von pytest, Tests grün'
+  - 'Alarmschwelle für Festplatte von 85 auf 90 Prozent'
+  - 'Backup-Prüfung: letztes Backup älter als 26 Stunden'
+  - 'Doku verweist auf docs/ALT.md, die Datei gibt es nicht mehr'
+  - 'Bestandsbuch: Dienst ohne Zweck eingetragen'
+  - 'Log-Auswertung: 40 Wiederholungen derselben Warnung im Hub'
+  - 'Rebase von feature/fusion auf den neuen Upstream-Stand'
+schwer_beispiele:
+  - 'Neue Fähigkeit: Der Agent soll künftig von selbst Pakete bestellen'
+  - 'Major-Update von Postgres 16 auf 17'
+  - 'Kernel 7.0.0-38 einspielen'
+  - 'NVIDIA-Treiber 610 aktualisieren'
+  - 'Kameras sollen Personen erkennen'
+  - 'Ergebnisse veröffentlichen'
+  - 'Neue GPU anschaffen'
+  - 'Passwort für das Git-Konto rotieren'
+  - 'PVC für alte Fotos löschen'
+  - 'Firewall-Regel für den Hub ändern'
+  - 'Datenschutz im Tagesbrief lockern'

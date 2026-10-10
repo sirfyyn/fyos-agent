@@ -1,0 +1,19 @@
+{
+  "id": "fyos-meldebudget",
+  "name": "FYOS Meldebudget",
+  "version": "2026.10.4",
+  "description": "Hoechstens N proaktive Meldungen pro Tag und Ruhezeiten; Antworten auf Nachrichten des Besitzers zaehlen nicht.",
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "tagesbudget": { "type": "integer", "minimum": 0, "maximum": 50 },
+      "ruheVon": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+      "ruheBis": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+      "zeitzone": { "type": "string", "minLength": 1 },
+      "antwortFensterMinuten": { "type": "integer", "minimum": 1, "maximum": 240 },
+      "buendelMinuten": { "type": "integer", "minimum": 0, "maximum": 60 }
+    },
+    "additionalProperties": false
+  }
+}
