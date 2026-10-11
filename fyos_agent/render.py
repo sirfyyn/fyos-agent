@@ -64,6 +64,11 @@ TELEGRAM_BESITZER_UMGEBUNG = "FYOS_APPROVER_TELEGRAM_ID"
 _TELEGRAM_TOKEN = re.compile(r"\d+:[A-Za-z0-9_-]+")
 #: Nutzer-IDs sind positive Zahlen; Gruppen und Kanäle haben negative IDs und kommen nicht in Frage.
 _TELEGRAM_ID = re.compile(r"[1-9]\d{0,15}")
+#: WhatsApp: Es gibt kein Token. Das Gateway koppelt sich per QR-Code (`openclaw channels login --channel whatsapp`,
+#: macht der Besitzer selbst); die Zugangsdaten liegen danach im Zustandsverzeichnis. Aus der Umgebung kommt nur
+#: die Nummer des Besitzers im internationalen Format (E.164), nie aus fyos.yaml und nie ins Repo.
+WHATSAPP_BESITZER_UMGEBUNG = "FYOS_APPROVER_WHATSAPP_NUMBER"
+_WHATSAPP_NUMMER = re.compile(r"\+[1-9]\d{6,14}")
 
 VORGABEN: dict[str, Any] = {
     "agent": {
@@ -95,7 +100,10 @@ VORGABEN: dict[str, Any] = {
                     "antwort_fenster_minuten": 10, "buendel_minuten": 5},
     "modell": {"kontext": 131072, "max_tokens": 16384, "denken": False, "bilder": False,
                "zeitlimit_s": 900},
-    "kanaele": {"matrix": False, "telegram": False},
+    "kanaele": {"matrix": False, "telegram": False, "whatsapp": False},
+    # eigene_nummer: der Agent läuft auf der privaten Nummer des Besitzers (Nachrichten an sich selbst gelten als
+    # Eingabe). Vorgabe false: eigene Nummer für den Agenten; dann wird Selbst-Verkehr ignoriert.
+    "whatsapp": {"eigene_nummer": False},
     "gateway": {"oeffentliche_url": "", "erlaubte_urspruenge": [],
                 "vertrauenswuerdige_proxys": ["127.0.0.1/32"]},
     "kontext_edit": {"aktiv": False},
@@ -104,6 +112,15 @@ VORGABEN: dict[str, Any] = {
     # Kopplung an den Hub (fyos-bruecke; leere hub_url = FYOS_HUB_URL ohne /mcp) und das Workboard als
     # gemeinsame Arbeitsliste (fyos-os: docs/KOPPLUNG-OPENCLAW.md)
     "kopplung": {"aktiv": True, "hub_url": "", "workboard": True},
+    # Gedaechtnis: Vektorsuche ueber denselben Embedding-Dienst wie der Hub (leer: FYOS_EMBED_URL, FYOS_EMBED_MODEL);
+    # ohne Dienst bleibt es bei der Textsuche, ausdruecklich und ohne "paused"-Warnung. aktives_gedaechtnis: ein
+    # Teilagent sucht vor jeder Antwort im Gedaechtnis (kostet je Antwort einen Modellaufruf, daher aus).
+    "gedaechtnis": {"embedder_url": "", "modell": "", "aktives_gedaechtnis": False},
+    # Mund und Ohr: Sprachausgabe und Spracheingabe ueber einen OpenAI-kompatiblen Dienst (leer: FYOS_MUND_URL,
+    # FYOS_OHR_URL). Ohne Adresse bleibt beides aus. automatisch: wann der Agent Antworten spricht (off, inbound,
+    # always, tagged); inbound = nur als Antwort auf Sprachnachrichten.
+    "mund": {"url": "", "modell": "", "stimme": "", "automatisch": "inbound"},
+    "ohr": {"url": "", "modell": ""},
     # Einstellungen fuer Zusatz-Plugins, je Plugin-ID: {aktiv, rechte: {gespraech, prompt}, config}
     "zusatz_plugins": {},
 }
@@ -121,6 +138,67 @@ def tief_mischen(basis: Mapping[str, Any], oben: Mapping[str, Any]) -> dict[str,
         else:
             aus[k] = copy.deepcopy(v)
     return aus
+
+
+EMBED_URL_UMGEBUNG = "FYOS_EMBED_URL"
+EMBED_MODELL_UMGEBUNG = "FYOS_EMBED_MODEL"
+EMBED_SCHLUESSEL_UMGEBUNG = "FYOS_EMBED_KEY"
+EMBED_MODELL_VORGABE = "embedding"
+
+
+def embedder(einstellung: Mapping[str, Any], env: Mapping[str, str]) -> dict[str, Any]:
+    """Embedding-Dienst fuer die Vektorsuche des Gedaechtnisses: ``{vektor, url, modell, schluessel}``.
+
+    Die Adresse kommt aus ``gedaechtnis.embedder_url`` oder ``FYOS_EMBED_URL`` (Basis ohne ``/v1``, dieselbe wie im
+    Hub), das Modell aus ``gedaechtnis.modell`` oder ``FYOS_EMBED_MODEL``. Der Schluessel steht nie in der Datei:
+    ``schluessel`` sagt nur, ob ``FYOS_EMBED_KEY`` gesetzt ist. Eine Adresse, die kein http(s) ist, gilt als nicht
+    gesetzt (Textsuche) und wird auf stderr gemeldet.
+    """
+    roh = str(einstellung.get("embedder_url") or env.get(EMBED_URL_UMGEBUNG) or "").strip().rstrip("/")
+    modell = str(einstellung.get("modell") or env.get(EMBED_MODELL_UMGEBUNG) or EMBED_MODELL_VORGABE).strip()
+    teile = urlsplit(roh) if roh else None
+    if roh and (teile is None or teile.scheme not in ("http", "https") or not teile.hostname):
+        print(f"fyos-render: Embedding-Adresse {roh!r} ist keine http(s)-Adresse; das Gedächtnis sucht nur im Text",
+              file=sys.stderr)
+        roh = ""
+    if roh.endswith("/v1"):
+        roh = roh[:-3].rstrip("/")
+    return {"vektor": bool(roh), "url": roh, "basis": f"{roh}/v1/" if roh else "", "modell": modell,
+            "schluessel": bool(env.get(EMBED_SCHLUESSEL_UMGEBUNG))}
+
+
+TTS_AUTO = ("off", "inbound", "always", "tagged")
+SPRACHDIENSTE = {
+    "mund": {"umgebung": "FYOS_MUND", "modell": "tts-1", "stimme": "alloy"},
+    "ohr": {"umgebung": "FYOS_OHR", "modell": "whisper-1", "stimme": ""},
+}
+
+
+def sprachdienst(name: str, einstellung: Mapping[str, Any], env: Mapping[str, str]) -> dict[str, Any]:
+    """Mund (Sprachausgabe) oder Ohr (Spracheingabe): ``{an, url, basis, modell, stimme, automatisch, schluessel}``.
+
+    Adresse aus ``<name>.url`` oder ``FYOS_MUND_URL`` / ``FYOS_OHR_URL`` (Basis ohne ``/v1``), Modell aus ``<name>.modell``
+    oder ``FYOS_MUND_MODEL`` / ``FYOS_OHR_MODEL``, Stimme aus ``mund.stimme`` oder ``FYOS_MUND_VOICE``. Der Schluessel
+    steht nie in der Datei (``schluessel`` sagt nur, ob ``FYOS_MUND_KEY`` / ``FYOS_OHR_KEY`` gesetzt ist). Eine Adresse,
+    die kein http(s) ist, gilt als nicht gesetzt und wird auf stderr gemeldet.
+    """
+    vorgabe = SPRACHDIENSTE[name]
+    praefix = vorgabe["umgebung"]
+    roh = str(einstellung.get("url") or env.get(f"{praefix}_URL") or "").strip().rstrip("/")
+    teile = urlsplit(roh) if roh else None
+    if roh and (teile is None or teile.scheme not in ("http", "https") or not teile.hostname):
+        print(f"fyos-render: Adresse {roh!r} fuer {name} ist keine http(s)-Adresse; {name} bleibt aus", file=sys.stderr)
+        roh = ""
+    if roh.endswith("/v1"):
+        roh = roh[:-3].rstrip("/")
+    automatisch = str(einstellung.get("automatisch") or "inbound").strip()
+    if automatisch not in TTS_AUTO:
+        print(f"fyos-render: mund.automatisch {automatisch!r} unbekannt, es gilt 'inbound'", file=sys.stderr)
+        automatisch = "inbound"
+    return {"an": bool(roh), "url": roh, "basis": f"{roh}/v1" if roh else "",
+            "modell": str(einstellung.get("modell") or env.get(f"{praefix}_MODEL") or vorgabe["modell"]).strip(),
+            "stimme": str(einstellung.get("stimme") or env.get(f"{praefix}_VOICE") or vorgabe["stimme"]).strip(),
+            "automatisch": automatisch, "schluessel": bool(env.get(f"{praefix}_KEY"))}
 
 
 def zusatz_plugins(ordner: Path, einstellungen: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -208,12 +286,25 @@ def telegram_besitzer(env: Mapping[str, str]) -> str:
     return besitzer
 
 
+def whatsapp_besitzer(env: Mapping[str, str]) -> str:
+    """Nummer des Besitzers (E.164, mit führendem +) aus der Umgebung. Fehlermeldungen nennen den Namen der
+    Variable, nie ihren Wert. Gruppen-Kennungen und Namen kommen nicht in Frage."""
+    nummer = env.get(WHATSAPP_BESITZER_UMGEBUNG, "")
+    if not nummer:
+        raise RenderFehler(f"kanaele.whatsapp ist an, aber {WHATSAPP_BESITZER_UMGEBUNG} fehlt "
+                           "(Nummer des Besitzers mit Ländervorwahl, siehe README, Abschnitt WhatsApp)")
+    if not _WHATSAPP_NUMMER.fullmatch(nummer):
+        raise RenderFehler(f"{WHATSAPP_BESITZER_UMGEBUNG} muss eine Telefonnummer im internationalen Format sein "
+                           "(+ und 7 bis 15 Ziffern, ohne Leerzeichen, Bindestriche oder Klammern)")
+    return nummer
+
+
 def lade_konfig(pfad: Path | None, zusatz: Path | None = None,
                 env: Mapping[str, str] | None = None, zustand: Path | None = None,
                 konfig_bleibt: bool = False) -> dict[str, Any]:
     """`zusatz`: Ordner der Zusatz-Plugins (Vorgabe $FYOS_AGENT_PLUGINS oder /opt/fyos-extra).
     `env`: Umgebung (Vorgabe os.environ); daraus kommen die öffentliche Adresse, der Zusatz-Ordner und die
-    Telegram-Angaben.
+    Telegram- und WhatsApp-Angaben.
     `zustand`: Zustandsverzeichnis von OpenClaw; daraus ergibt sich, ob die Ersteinrichtung offen ist (ohne Angabe
     entscheidet allein der Schalter faehigkeiten.ersteinrichtung). `konfig_bleibt`: die vorhandene
     Gateway-Konfiguration wird nicht ersetzt, die Ersteinrichtung bleibt dann zu."""
@@ -235,9 +326,12 @@ def lade_konfig(pfad: Path | None, zusatz: Path | None = None,
     if kanaele.get("telegram"):
         ctx["besitzer"]["telegram_id"] = telegram_besitzer(env)
         owner_ids.append(f"telegram:{ctx['besitzer']['telegram_id']}")
+    if kanaele.get("whatsapp"):
+        ctx["besitzer"]["whatsapp_nummer"] = whatsapp_besitzer(env)
+        owner_ids.append(f"whatsapp:{ctx['besitzer']['whatsapp_nummer']}")
     ctx["besitzer"]["owner_ids"] = owner_ids
     # Die Vorlagensprache kennt kein "oder": ein Kanal ist an, wenn irgendeiner an ist.
-    ctx["kanaele_aktiv"] = bool(kanaele.get("matrix") or kanaele.get("telegram"))
+    ctx["kanaele_aktiv"] = bool(kanaele.get("matrix") or kanaele.get("telegram") or kanaele.get("whatsapp"))
     # Ersteinrichtung als Gespräch: offen nur bei frischer Installation (einrichtung.entscheide). Kennt die
     # Konfiguration den Namen des Besitzers nicht (Vorgabe), gehört er zu den Fragen.
     entscheidung = einrichtung.entscheide(zustand, bool(ctx["faehigkeiten"].get("ersteinrichtung")), konfig_bleibt)
@@ -246,6 +340,10 @@ def lade_konfig(pfad: Path | None, zusatz: Path | None = None,
         "grund": entscheidung.grund,
         "name_bekannt": str(ctx["besitzer"].get("name") or "") not in ("", VORGABEN["besitzer"]["name"]),
     }
+    ctx["gedaechtnis"] = {**ctx["gedaechtnis"], "aktives_gedaechtnis": bool(ctx["gedaechtnis"].get("aktives_gedaechtnis")),
+                          **embedder(ctx["gedaechtnis"], env)}
+    ctx["mund"] = sprachdienst("mund", ctx["mund"], env)
+    ctx["ohr"] = sprachdienst("ohr", ctx["ohr"], env)
     gw = ctx["gateway"]
     # Ohne eigene Angabe gilt die öffentliche Adresse der Installation ($FYOS_OEFFENTLICH_URL): von dort öffnet
     # der Browser die Control UI im Fenster der Shell, und das Gateway lässt nur erlaubte Ursprünge herein.

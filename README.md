@@ -60,8 +60,12 @@ wie der Start sie zuletzt schrieb (siehe „Ersteinrichtung als Gespräch“).
 | `OPENCLAW_GATEWAY_TOKEN` | Anmeldung am Gateway (Token); signiert auch die Ereignisse an den Hub |
 | `FYOS_OEFFENTLICH_URL` | Öffentliche Adresse der Installation (wie für Hub und Shell); ohne `gateway.oeffentliche_url` in `fyos.yaml` der erlaubte Ursprung der Control UI |
 | `FYOS_VORGAENGE_URL` | optional: Vorgangs-Dienst für `fyos-freigabe-chat` |
+| `FYOS_EMBED_URL`, `FYOS_EMBED_MODEL`, `FYOS_EMBED_KEY` | optional: Embedding-Dienst für die Vektorsuche des Gedächtnisses (OpenAI-kompatibel, Adresse ohne `/v1`, dieselbe wie im Hub; `gedaechtnis.*` in `fyos.yaml` geht vor). Ohne ihn sucht der Agent ausdrücklich nur im Text (`memory.search.provider: none`) |
+| `FYOS_MUND_URL`, `FYOS_MUND_MODEL`, `FYOS_MUND_VOICE`, `FYOS_MUND_KEY` | optional: Sprachausgabe über einen OpenAI-kompatiblen Dienst (`tts.providers.openai`, Adresse ohne `/v1`; `mund.*` in `fyos.yaml` geht vor). Ohne Adresse ist die Sprachausgabe aus |
+| `FYOS_OHR_URL`, `FYOS_OHR_MODEL`, `FYOS_OHR_KEY` | optional: Spracheingabe über einen OpenAI-kompatiblen Dienst (`tools.media.models` mit Fähigkeit `audio`; `ohr.*` in `fyos.yaml` geht vor). Ohne Adresse bleibt die Voreinstellung von OpenClaw |
 | `FYOS_MATRIX_HOMESERVER`, `FYOS_MATRIX_BENUTZER`, `OPENCLAW_MATRIX_TOKEN`, `FYOS_APPROVER_MATRIX_ID` | optional: Matrix-Kanal (`kanaele.matrix: true`; Bild mit `--build-arg FYOS_KANAELE=matrix` bauen) |
 | `OPENCLAW_TELEGRAM_TOKEN`, `FYOS_APPROVER_TELEGRAM_ID` | optional: Telegram-Kanal (`kanaele.telegram: true`; Bot-Token und numerische Besitzer-ID, siehe Abschnitt „Telegram“; steckt schon im Basisbild, kein Build-Argument) |
+| `FYOS_APPROVER_WHATSAPP_NUMBER` | optional: WhatsApp-Kanal (`kanaele.whatsapp: true`; Nummer des Besitzers im Format `+491701234567`, siehe Abschnitt „WhatsApp“; Bild mit `--build-arg FYOS_KANAELE=whatsapp` bauen, QR-Kopplung macht der Besitzer) |
 
 Nur rendern, ohne Docker:
 
@@ -126,6 +130,46 @@ Anfrage des Vorgangs-Dienstes zusätzlich als reine Textnachricht an Telegram, u
 (`genehmigt CHG-42`, `abgelehnt CHG-42`, `kommentar CHG-42: …`) entscheidet wie in Matrix ohne Modellaufruf; es
 genügt, wenn ein Kanal zustellt. Die Reaktions-Knöpfe sind eine Matrix-Eigenheit und fehlen in Telegram.
 
+## WhatsApp
+
+WhatsApp ist der dritte Kanal. OpenClaw koppelt sich als „verknüpftes Gerät“ (WhatsApp Web) per QR-Code; es gibt
+weder ein Token noch einen Bot-Zugang. Das Paket `@openclaw/whatsapp` gehört nicht zum Basisbild und wird
+wie Matrix beim Bau auf die Basisversion festgenagelt installiert: `--build-arg FYOS_KANAELE=whatsapp` (oder
+`matrix,whatsapp`). Vorgabe: aus. Mit `kanaele.whatsapp: true` schreibt der Renderer einen Kanal, der nur
+Direktnachrichten der Nummer des Besitzers annimmt: `dmPolicy: allowlist` mit genau dieser Nummer (kein
+Pairing: wer sonst schreibt, wird verworfen und löst keine Kopplungsanfrage aus), `groupPolicy: disabled`,
+`configWrites: false` und `pluginHooks.messageReceived: false` (andere Plugins sehen keine eingehenden Inhalte).
+Die Nummer des Besitzers steht nie in `fyos.yaml`, nur in der Umgebung (`FYOS_APPROVER_WHATSAPP_NUMBER`, mit `+` und
+Ländervorwahl, sonst bricht das Rendern mit einer Meldung ab, die den Namen der Variable nennt und nie ihren Wert).
+Matrix, Telegram und WhatsApp lassen sich einzeln oder zusammen einschalten.
+
+Einrichten:
+
+1. Eine eigene Nummer für den Agenten besorgen (empfohlen: eine zweite SIM oder eSIM und WhatsApp darauf, getrennt
+   vom privaten Konto). Wer den Agenten auf der privaten Nummer laufen lassen will, setzt zusätzlich
+   `whatsapp: {eigene_nummer: true}`; dann gelten Nachrichten an sich selbst als Eingabe.
+2. Das Bild mit `--build-arg FYOS_KANAELE=whatsapp` bauen. Das Zustandsverzeichnis `~/.openclaw` muss auf einem Volume
+   liegen: die Kopplung steht danach unter `~/.openclaw/credentials/whatsapp/default/`.
+3. Die Nummer des Besitzers als `FYOS_APPROVER_WHATSAPP_NUMBER` setzen (`+491701234567`-Schreibweise), in `fyos.yaml`
+   `kanaele: {whatsapp: true}` eintragen und das Gateway (neu) starten.
+4. **Die Kopplung macht der Besitzer selbst** (dazu braucht es das Telefon): im Container
+   `openclaw channels login --channel whatsapp` aufrufen und den QR-Code in WhatsApp unter „Verknüpfte Geräte“
+   scannen. Der Code läuft schnell ab; das Terminal muss den QR-Code lesbar zeigen. Prüfen mit
+   `openclaw channels status --probe`.
+5. Dem Agenten von der Besitzer-Nummer aus schreiben. Eine Nachricht vom Agenten an den Besitzer geht erst, wenn die
+   Kopplung steht (das Gateway läuft und das Konto ist verknüpft); sonst schlägt das Senden sofort fehl.
+
+Freigaben laufen auch über WhatsApp. Native Freigaben des Agenten kommen als Nachricht, die der Besitzer mit 👍
+oder 👎 beantwortet (`approvals.plugin.targets`). Mit `fyos-freigabe-chat` geht eine Anfrage des Vorgangs-Dienstes
+zusätzlich als reine Textnachricht an WhatsApp (über die Schnittstelle des Gateways im selben Container, angemeldet
+mit `OPENCLAW_GATEWAY_TOKEN`; ohne gekoppelte Sitzung schlägt nur dieser Kanal fehl), und die Antwort des Besitzers
+(`genehmigt CHG-42`, `abgelehnt CHG-42`, `kommentar CHG-42: …`) entscheidet wie in Matrix ohne Modellaufruf; es
+genügt, wenn ein Kanal zustellt.
+
+Weitere Kanäle, die OpenClaw selbst kann (Signal über signal-cli, Slack, Discord, iMessage, Microsoft Teams u. a.),
+sind hier nicht vorbereitet; sie ließen sich auf demselben Weg ergänzen (Zusatzpaket beim Bau, `kanaele.<name>`,
+Bindung, Besitzer-Allowlist).
+
 ## Ersteinrichtung als Gespräch
 
 Beim ersten Gespräch einer frischen Installation lernt der Agent den Besitzer kennen, statt dass alles vorab in
@@ -176,7 +220,7 @@ python3 tools/sauber.py .                        # keine persönlichen Inhalte
 |---|---|---|
 | `fyos-prioritaet` | Werkzeug `fyos_conversation_status`, 15-Minuten-Nachlauf, dauerhafter Zustand | an |
 | `fyos-meldebudget` | höchstens N proaktive Meldungen pro Tag, Ruhezeiten, im Hook `message_sending` | an |
-| `fyos-freigabe-chat` | Chat-/Matrix-/Telegram-Antwort des Besitzers entscheidet eine offene Freigabe, ohne Modellaufruf | an, wenn `faehigkeiten.vorgaenge: true` und `FYOS_VORGAENGE_URL` gesetzt |
+| `fyos-freigabe-chat` | Chat-/Matrix-/Telegram-/WhatsApp-Antwort des Besitzers entscheidet eine offene Freigabe, ohne Modellaufruf | an, wenn `faehigkeiten.vorgaenge: true` und `FYOS_VORGAENGE_URL` gesetzt |
 | `fyos-kontext-edit` | Experiment: Agent bereinigt eigene Werkzeugergebnisse | aus |
 | `fyos-speed-router` | optional: kurze Plauderturns an ein kleines Modell | aus (braucht `tempo_router.ziel_modell`) |
 | `fyos-bruecke` | Kopplung an den Hub: Werkzeug- und Modellaufrufe, Läufe, Sitzungen, Cron, Skills als Ereignisse ohne Inhalte an den Hub; Route `/plugins/fyos-bruecke/v1/rpc` für Workboard, Skills, Cron und Nutzung (feste Methodenliste) | an (`kopplung.aktiv`) |

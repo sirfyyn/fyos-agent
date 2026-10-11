@@ -92,6 +92,8 @@
           alsoAllow: [
             "read", "memory_search", "memory_get", "ask_user", "session_status",
             "fyos*", "mcp*", "hub*", "message", "web_fetch",
+            // Fortschrittskarte je Sitzung (sichtbar im Hub: openclaw.lebt) und Standing Intents für Zusagen (nur Besitzer).
+            "progress_card", "intent",
 {{#if kopplung.workboard}}
             // Arbeitsliste ohne Worker-Protokoll (kein claim, dispatch, complete).
             "workboard_list", "workboard_read", "workboard_boards", "workboard_create", "workboard_comment", "workboard_move",
@@ -113,6 +115,56 @@
     },
   },
   talk: { agentId: "{{agent.id}}" },
+
+  // Gedächtnis (fyos-os: docs/KOPPLUNG-OPENCLAW.md, Abschnitt Gedächtnis): mit Embedding-Dienst (gleiche Adresse wie
+  // der Hub, FYOS_EMBED_URL) Vektor- und Textsuche, sonst ausdrücklich nur Textsuche. Ohne diese Angabe verlangt
+  // OpenClaw einen OpenAI-Schlüssel und hält die Vektorsuche an ("paused").
+  memory: {
+    search: {
+{{#if gedaechtnis.vektor}}
+      provider: "openai-compatible",
+      model: {{json gedaechtnis.modell}},
+      remote: {
+        baseUrl: {{json gedaechtnis.basis}},
+{{#if gedaechtnis.schluessel}}
+        apiKey: "${FYOS_EMBED_KEY}",
+{{/if}}
+{{#unless gedaechtnis.schluessel}}
+        apiKey: "ohne-schluessel",
+{{/unless}}
+      },
+{{/if}}
+{{#unless gedaechtnis.vektor}}
+      provider: "none",
+{{/unless}}
+    },
+  },
+{{#if mund.an}}
+
+  // Mund (fyos-os: docs/KOPPLUNG-OPENCLAW.md, Abschnitt Optionale Dienste): Sprachausgabe ueber einen OpenAI-kompatiblen
+  // Dienst (FYOS_MUND_URL). Ohne Adresse bleibt die Sprachausgabe aus.
+  tts: {
+    enabled: true,
+    auto: {{json mund.automatisch}},
+    provider: "openai",
+    providers: {
+      openai: {
+        baseUrl: {{json mund.basis}},
+        model: {{json mund.modell}},
+        voice: {{json mund.stimme}},
+{{#if mund.schluessel}}
+        apiKey: "${FYOS_MUND_KEY}",
+{{/if}}
+{{#unless mund.schluessel}}
+        apiKey: "ohne-schluessel",
+{{/unless}}
+      },
+    },
+  },
+{{/if}}
+{{#unless mund.an}}
+  tts: { auto: "off" },
+{{/unless}}
 {{#if kanaele_aktiv}}
   // Mit agents.ownership "explicit" braucht jeder Kanal eine Bindung an den Agenten.
   bindings: [
@@ -121,6 +173,9 @@
 {{/if}}
 {{#if kanaele.telegram}}
     { agentId: "{{agent.id}}", match: { channel: "telegram", accountId: "default" } },
+{{/if}}
+{{#if kanaele.whatsapp}}
+    { agentId: "{{agent.id}}", match: { channel: "whatsapp", accountId: "default" } },
 {{/if}}
   ],
 {{/if}}
@@ -131,6 +186,26 @@
     // Werkzeug-Schleifen erkennen, bevor sie Zeit und Geld kosten.
     loopDetection: { enabled: true },
     web: { fetch: { enabled: true } },
+{{#if ohr.an}}
+    // Ohr: Spracheingabe (Sprachnachrichten werden zu Text) ueber einen OpenAI-kompatiblen Dienst (FYOS_OHR_URL).
+    media: {
+      models: [
+        {
+          provider: "openai",
+          model: {{json ohr.modell}},
+          baseUrl: {{json ohr.basis}},
+          capabilities: ["audio"],
+{{#if ohr.schluessel}}
+          request: { auth: { mode: "authorization-bearer", token: "${FYOS_OHR_KEY}" } },
+{{/if}}
+{{#unless ohr.schluessel}}
+          request: { auth: { mode: "authorization-bearer", token: "ohne-schluessel" } },
+{{/unless}}
+        },
+      ],
+      audio: { enabled: true },
+    },
+{{/if}}
   },
 
 {{#if kanaele_aktiv}}
@@ -162,6 +237,21 @@
       configWrites: false,
       // Freigabe-Knöpfe nur in Direktnachrichten.
       capabilities: { inlineButtons: "dm" },
+    },
+{{/if}}
+{{#if kanaele.whatsapp}}
+    // WhatsApp (Zusatzpaket @openclaw/whatsapp, Bau mit FYOS_KANAELE=whatsapp). Gekoppelt wird per QR-Code durch den
+    // Besitzer (openclaw channels login --channel whatsapp); es gibt kein Token. Nur Direktnachrichten von der
+    // Nummer des Besitzers (aus der Umgebung); wer sonst schreibt, wird verworfen und löst keine Kopplungsanfrage aus.
+    // Gruppen sind aus, der Kanal darf die Konfiguration nicht schreiben, Plugins sehen keine eingehenden Inhalte.
+    whatsapp: {
+      enabled: true,
+      dmPolicy: "allowlist",
+      allowFrom: [{{json besitzer.whatsapp_nummer}}],
+      groupPolicy: "disabled",
+      selfChatMode: {{json whatsapp.eigene_nummer}},
+      configWrites: false,
+      pluginHooks: { messageReceived: false },
     },
 {{/if}}
   },
@@ -230,11 +320,13 @@
 {{#if kanaele.telegram}}
       { channel: "telegram", to: {{json besitzer.telegram_id}} },
 {{/if}}
+{{#if kanaele.whatsapp}}
+      { channel: "whatsapp", to: {{json besitzer.whatsapp_nummer}} },
+{{/if}}
     ] },
   },
 {{/if}}
   hooks: { enabled: false },
-  tts: { auto: "off" },
   ui: { prefs: { locale: "{{sprache_code}}" } },
 
   plugins: {
@@ -249,6 +341,9 @@
 {{/if}}
 {{#if kanaele.telegram}}
       telegram: { enabled: true },
+{{/if}}
+{{#if kanaele.whatsapp}}
+      whatsapp: { enabled: true },
 {{/if}}
       "fyos-prioritaet": {
         enabled: true,
@@ -268,15 +363,24 @@
       "fyos-bruecke": {
         enabled: {{json kopplung.aktiv}},
         hooks: { allowConversationAccess: false, allowPromptInjection: false },
+        config: {
+          agentId: "{{agent.id}}",
 {{#if kopplung.hub_url}}
-        config: { hubUrl: {{json kopplung.hub_url}} },
+          hubUrl: {{json kopplung.hub_url}},
 {{/if}}
+        },
       },
       // Ersteinrichtung als Gespräch: das Werkzeug, mit dem der Agent USER.md und IDENTITY.md füllt. Nur an,
       // solange die Einrichtung offen ist; ohne Einblick ins Gespräch und ohne Prompt-Recht.
       "fyos-ersteinrichtung": {
         enabled: {{json ersteinrichtung.offen}},
         hooks: { allowConversationAccess: false, allowPromptInjection: false },
+      },
+      // Aktives Gedächtnis: ein Teilagent sucht vor jeder Antwort im Gedächtnis (nur Direktgespräche). Aus, weil es je
+      // Antwort einen Modellaufruf kostet; schaltbar mit gedaechtnis.aktives_gedaechtnis.
+      "active-memory": {
+        enabled: {{json gedaechtnis.aktives_gedaechtnis}},
+        config: { mode: "escalate", agents: ["{{agent.id}}"], allowedChatTypes: ["direct"], timeoutMs: 15000 },
       },
       "fyos-meldebudget": {
         enabled: true,

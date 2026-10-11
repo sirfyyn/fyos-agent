@@ -51,6 +51,12 @@ modell:                    # Verbindung selbst kommt aus FYOS_MODELL_* (Umgebung
 kanaele:
   matrix: false            # true: FYOS_MATRIX_HOMESERVER, FYOS_MATRIX_BENUTZER, OPENCLAW_MATRIX_TOKEN setzen
   telegram: false          # true: OPENCLAW_TELEGRAM_TOKEN und FYOS_APPROVER_TELEGRAM_ID (Besitzer) setzen; nur Direktnachrichten
+  whatsapp: false          # true: FYOS_APPROVER_WHATSAPP_NUMBER (Besitzer, +Ländervorwahl) setzen, Bild mit
+                           # --build-arg FYOS_KANAELE=whatsapp bauen, QR-Kopplung durch den Besitzer; nur Direktnachrichten
+
+# Nur mit kanaele.whatsapp
+whatsapp:
+  eigene_nummer: false     # true: der Agent läuft auf der privaten Nummer des Besitzers (Notizen an sich selbst); besser: eigene Nummer
 
 gateway:
   oeffentliche_url: ""     # z. B. "https://fyos.example.com"; leer: $FYOS_OEFFENTLICH_URL
@@ -70,6 +76,24 @@ kopplung:
   aktiv: true              # fyos-bruecke: Ereignisse ohne Inhalte an den Hub, Abfragen vom Hub
   hub_url: ""              # leer: aus FYOS_HUB_URL ohne /mcp, z. B. http://hub:8080
   workboard: true          # OpenClaw-Workboard an; der Agent liest, legt an, kommentiert, verschiebt Karten
+
+# Gedächtnis: Vektorsuche über denselben Embedding-Dienst wie der Hub (FYOS_EMBED_URL ohne /v1, FYOS_EMBED_MODEL,
+# optional FYOS_EMBED_KEY in der Umgebung). Ohne Dienst sucht der Agent im Text (provider "none"), ausdrücklich.
+gedaechtnis:
+  embedder_url: ""         # leer: FYOS_EMBED_URL
+  modell: ""               # leer: FYOS_EMBED_MODEL, sonst "embedding"
+  aktives_gedaechtnis: false   # true: ein Teilagent sucht vor jeder Antwort im Gedächtnis (ein Modellaufruf je Antwort)
+
+# Mund und Ohr: Sprachausgabe und Spracheingabe über je einen OpenAI-kompatiblen Dienst (Adresse ohne /v1). Beides ist
+# optional; ohne Adresse bleibt es aus. Schlüssel nur in der Umgebung (FYOS_MUND_KEY, FYOS_OHR_KEY).
+mund:
+  url: ""                  # leer: FYOS_MUND_URL
+  modell: ""               # leer: FYOS_MUND_MODEL, sonst "tts-1"
+  stimme: ""               # leer: FYOS_MUND_VOICE, sonst "alloy"
+  automatisch: inbound     # off | inbound (nur als Antwort auf Sprachnachrichten) | always | tagged
+ohr:
+  url: ""                  # leer: FYOS_OHR_URL
+  modell: ""               # leer: FYOS_OHR_MODEL, sonst "whisper-1"
 
 # Zusatz-Plugins ohne Fork: jeder Ordner mit openclaw.plugin.json unter /opt/fyos-extra
 # (oder $FYOS_AGENT_PLUGINS) wird geladen, ohne Einblick ins Gespräch und ohne Prompt-Recht.

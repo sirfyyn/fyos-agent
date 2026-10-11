@@ -1,9 +1,10 @@
 # openclaw/: Bild, Einstieg, Patches
 
 Das Bild baut auf `ghcr.io/openclaw/openclaw@sha256:0da12cd49983fcb5e4915fd3135ce7a33d82f93649b1df6964946d2c1d1dbcfc`
-(OpenClaw 2026.9.7) mit `@openclaw/matrix@2026.9.7` (nur mit `--build-arg FYOS_KANAELE=matrix`). Telegram
-gehört zum Basisbild und braucht keine Installation beim Bau; ein Kanal wird erst durch `kanaele.<name>` in
-`fyos.yaml` aktiv.
+(OpenClaw 2026.9.7) mit `@openclaw/matrix@2026.9.7` und `@openclaw/whatsapp@2026.9.7` (nur mit
+`--build-arg FYOS_KANAELE=matrix`, `=whatsapp` oder `=matrix,whatsapp`). Telegram gehört zum Basisbild und braucht
+keine Installation beim Bau; ein Kanal wird erst durch `kanaele.<name>` in `fyos.yaml` aktiv. Die Kopplung von
+WhatsApp (QR-Code) liegt nach dem Start unter `~/.openclaw/credentials/whatsapp/` und muss auf einem Volume liegen.
 
 ## Patches (`patches/`)
 

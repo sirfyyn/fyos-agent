@@ -6,8 +6,16 @@ name: ci
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+  # Laufend getestet (Entscheidungsbuch Nr. 144): täglich gegen die neuesten Pakete aus dem
+  # Index, auch ohne Commit. Rot meldet die Erkunden-Schleife als Vorgang (Bereich dist).
+  schedule:
+    - cron: "11 5 * * *"
 
+# Je Commit genau ein Lauf: Zweige prüft der PR-Lauf, main der Push-Lauf. Prüfen Push und PR denselben Commit,
+# bricht Gitea den wartenden zweiten Lauf ab, und der Abbruch zählt als Fehlschlag.
 concurrency:
   group: ${{ gitea.workflow }}-${{ gitea.ref }}
   cancel-in-progress: false

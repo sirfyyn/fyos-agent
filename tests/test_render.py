@@ -108,7 +108,8 @@ def test_kopplung_ist_vorgabe(tmp_path):
     assert bruecke["enabled"] is True
     # Die Brücke sieht keine Inhalte und ändert keinen Prompt.
     assert bruecke["hooks"] == {"allowConversationAccess": False, "allowPromptInjection": False}
-    assert "config" not in bruecke  # Hub-Adresse aus FYOS_HUB_URL
+    # Hub-Adresse aus FYOS_HUB_URL; die Kennung des Agenten steht in der Konfiguration (Wecken, Sitzung je Vorgang).
+    assert bruecke["config"] == {"agentId": "main"}
     assert eintraege["workboard"] == {"enabled": True}
     assert "/opt/fyos/fyos-bruecke" in cfg["plugins"]["load"]["paths"]
     erlaubt = set(cfg["agents"]["entries"]["main"]["tools"]["alsoAllow"])
@@ -126,12 +127,119 @@ def test_kopplung_abschaltbar(tmp_path):
     cfg = json5lite.lade((ziel / "openclaw.json5").read_text(encoding="utf-8"))
     bruecke = cfg["plugins"]["entries"]["fyos-bruecke"]
     assert bruecke["enabled"] is False
-    assert bruecke["config"] == {"hubUrl": "http://hub.example.com:8080"}
+    assert bruecke["config"] == {"agentId": "main", "hubUrl": "http://hub.example.com:8080"}
     assert "workboard" not in cfg["plugins"]["entries"]
     assert not any(t.startswith("workboard_") for t in cfg["agents"]["entries"]["main"]["tools"]["alsoAllow"])
     # Die Skills aus fyos-agent hängen nicht an der Kopplung: AGENTS.md verweist immer auf sie.
     assert cfg["skills"]["load"]["extraDirs"] == ["/opt/fyos/skills"]
     assert "Workboard" not in (ziel / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
+
+
+def _gedaechtnis(tmp_path: Path, yaml_text: str = "", env: dict[str, str] | None = None) -> dict:
+    konfig = tmp_path / "fyos.yaml"
+    konfig.write_text(yaml_text or "{}\n", encoding="utf-8")
+    ctx = render.lade_konfig(konfig, env=env or {})
+    render.rendere(WURZEL, ctx, tmp_path / "ziel", env=ENV)
+    text = (tmp_path / "ziel" / "openclaw.json5").read_text(encoding="utf-8")
+    assert "{{" not in text
+    return json5lite.lade(text)
+
+
+def test_gedaechtnis_ohne_embedding_dienst_sucht_ausdruecklich_nur_im_text(tmp_path):
+    cfg = _gedaechtnis(tmp_path)
+    assert cfg["memory"] == {"search": {"provider": "none"}}
+    assert cfg["plugins"]["entries"]["active-memory"]["enabled"] is False
+
+
+def test_gedaechtnis_nimmt_den_embedding_dienst_des_hubs(tmp_path):
+    env = {"FYOS_EMBED_URL": "http://embed:8081/", "FYOS_EMBED_MODEL": "bge-m3"}
+    such = _gedaechtnis(tmp_path, env=env)["memory"]["search"]
+    assert such["provider"] == "openai-compatible" and such["model"] == "bge-m3"
+    assert such["remote"] == {"baseUrl": "http://embed:8081/v1/", "apiKey": "ohne-schluessel"}
+
+
+def test_gedaechtnis_schluessel_bleibt_in_der_umgebung(tmp_path):
+    env = {"FYOS_EMBED_URL": "https://api.example.com/v1", "FYOS_EMBED_KEY": "sk-geheim"}
+    cfg = _gedaechtnis(tmp_path, env=env)
+    such = cfg["memory"]["search"]
+    assert such["remote"] == {"baseUrl": "https://api.example.com/v1/", "apiKey": "${FYOS_EMBED_KEY}"}
+    assert such["model"] == "embedding"
+    assert "sk-geheim" not in (tmp_path / "ziel" / "openclaw.json5").read_text(encoding="utf-8")
+
+
+def test_gedaechtnis_yaml_geht_vor_umgebung(tmp_path):
+    cfg = _gedaechtnis(tmp_path, "gedaechtnis: {embedder_url: 'http://eigen:9000', modell: klein}\n",
+                       {"FYOS_EMBED_URL": "http://hub-embed:8081", "FYOS_EMBED_MODEL": "gross"})
+    such = cfg["memory"]["search"]
+    assert such["remote"]["baseUrl"] == "http://eigen:9000/v1/" and such["model"] == "klein"
+
+
+@pytest.mark.parametrize("adresse", ["embed:8081", "ftp://embed", "http://", "file:///etc/passwd"])
+def test_gedaechtnis_unbrauchbare_adresse_bleibt_beim_text(tmp_path, adresse, capsys):
+    cfg = _gedaechtnis(tmp_path, env={"FYOS_EMBED_URL": adresse})
+    assert cfg["memory"]["search"] == {"provider": "none"}
+    assert "keine http(s)-Adresse" in capsys.readouterr().err
+
+
+def test_aktives_gedaechtnis_ist_schaltbar(tmp_path):
+    cfg = _gedaechtnis(tmp_path, "gedaechtnis: {aktives_gedaechtnis: true}\nagent: {id: wache}\n")
+    eintrag = cfg["plugins"]["entries"]["active-memory"]
+    assert eintrag["enabled"] is True
+    assert eintrag["config"]["agents"] == ["wache"] and eintrag["config"]["allowedChatTypes"] == ["direct"]
+
+
+def test_mund_und_ohr_sind_ohne_adresse_aus(tmp_path):
+    cfg = _gedaechtnis(tmp_path)
+    assert cfg["tts"] == {"auto": "off"} and "media" not in cfg["tools"]
+
+
+def test_mund_nimmt_den_dienst_aus_der_umgebung(tmp_path):
+    cfg = _gedaechtnis(tmp_path, env={"FYOS_MUND_URL": "http://mund:8880/", "FYOS_MUND_MODEL": "kokoro",
+                                      "FYOS_MUND_VOICE": "af_heart"})
+    assert cfg["tts"]["enabled"] is True and cfg["tts"]["auto"] == "inbound" and cfg["tts"]["provider"] == "openai"
+    assert cfg["tts"]["providers"]["openai"] == {"baseUrl": "http://mund:8880/v1", "model": "kokoro",
+                                                 "voice": "af_heart", "apiKey": "ohne-schluessel"}
+
+
+def test_mund_yaml_geht_vor_umgebung_und_schluessel_bleibt_aussen(tmp_path):
+    cfg = _gedaechtnis(tmp_path, "mund: {url: 'https://mund.example/v1', stimme: nova, automatisch: always}\n",
+                       {"FYOS_MUND_URL": "http://anders:1", "FYOS_MUND_KEY": "sk-geheim"})
+    anbieter = cfg["tts"]["providers"]["openai"]
+    assert cfg["tts"]["auto"] == "always" and anbieter["baseUrl"] == "https://mund.example/v1"
+    assert anbieter["voice"] == "nova" and anbieter["model"] == "tts-1" and anbieter["apiKey"] == "${FYOS_MUND_KEY}"
+    assert "sk-geheim" not in (tmp_path / "ziel" / "openclaw.json5").read_text(encoding="utf-8")
+
+
+def test_mund_unbekannte_betriebsart_und_unbrauchbare_adresse(tmp_path, capsys):
+    cfg = _gedaechtnis(tmp_path, "mund: {url: 'http://mund:1', automatisch: manchmal}\n", {"FYOS_OHR_URL": "ftp://ohr"})
+    assert cfg["tts"]["auto"] == "inbound" and "media" not in cfg["tools"]
+    fehler = capsys.readouterr().err
+    assert "unbekannt" in fehler and "keine http(s)-Adresse" in fehler
+
+
+def test_ohr_wird_zum_audio_modell_der_medien(tmp_path):
+    cfg = _gedaechtnis(tmp_path, env={"FYOS_OHR_URL": "http://ohr:8000", "FYOS_OHR_KEY": "sk-geheim"})
+    medien = cfg["tools"]["media"]
+    assert medien["audio"] == {"enabled": True}
+    (modell,) = medien["models"]
+    assert modell["capabilities"] == ["audio"] and modell["baseUrl"] == "http://ohr:8000/v1"
+    assert modell["model"] == "whisper-1" and modell["request"]["auth"]["token"] == "${FYOS_OHR_KEY}"
+    assert "sk-geheim" not in (tmp_path / "ziel" / "openclaw.json5").read_text(encoding="utf-8")
+
+
+def test_fortschrittskarte_und_zusagen(tmp_path):
+    ziel = rendere(tmp_path)
+    cfg = json5lite.lade((ziel / "openclaw.json5").read_text(encoding="utf-8"))
+    erlaubt = set(cfg["agents"]["entries"]["main"]["tools"]["alsoAllow"])
+    assert {"progress_card", "intent"} <= erlaubt
+    agents = (ziel / "workspace" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "Skill `zusagen`" in agents and "`progress_card`" in agents
+    skill = (WURZEL / "skills" / "zusagen" / "SKILL.md").read_text(encoding="utf-8")
+    kopf = yaml.safe_load(skill.split("---")[1])
+    assert kopf["name"] == "zusagen" and "Zusage" in kopf["description"]
+    assert "{{" not in skill, "Skills werden nicht gerendert"
+    for baustein in ("workboard_create", "intent", "openclaw.auftrag_vorlage", "ausdrücklichen Wunsch"):
+        assert baustein in skill
 
 
 def test_skill_verweise_liegen_im_bild():
@@ -262,6 +370,109 @@ def test_cli_meldet_fehlendes_telegram_token(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("OPENCLAW_TELEGRAM_TOKEN")
     assert render.main(["--config", str(konfig), "--ziel", str(tmp_path / "ziel")]) == 1
     assert "OPENCLAW_TELEGRAM_TOKEN fehlt" in capsys.readouterr().err
+
+
+# ── WhatsApp als dritter Kanal ────────────────────────────────────────────
+
+WHATSAPP_NUMMER = "+4915100000000"
+WHATSAPP_ENV = {**ENV, "FYOS_APPROVER_WHATSAPP_NUMBER": WHATSAPP_NUMMER}
+
+
+def test_whatsapp_ist_vorgabe_aus_und_aendert_nichts(tmp_path):
+    cfg = json5lite.lade((rendere(tmp_path) / "openclaw.json5").read_text(encoding="utf-8"))
+    assert not {"channels", "bindings", "approvals"} & set(cfg)
+    assert "whatsapp" not in cfg["plugins"]["entries"]
+    assert render.VORGABEN["kanaele"]["whatsapp"] is False
+
+
+def test_whatsapp_nur_direktnachrichten_des_besitzers(tmp_path):
+    cfg, text = _kanaele(tmp_path, "{whatsapp: true}", env=WHATSAPP_ENV)
+    assert cfg["channels"] == {"whatsapp": {
+        "enabled": True,
+        "dmPolicy": "allowlist",
+        "allowFrom": [WHATSAPP_NUMMER],
+        "groupPolicy": "disabled",
+        "selfChatMode": False,
+        "configWrites": False,
+        "pluginHooks": {"messageReceived": False},
+    }}
+    assert cfg["bindings"] == [{"agentId": "main", "match": {"channel": "whatsapp", "accountId": "default"}}]
+    # Der Besitzer ist in WhatsApp Besitzer des Gesprächs: so greift die Freigabe per Text (fyos-freigabe-chat).
+    assert cfg["commands"]["ownerAllowFrom"] == [f"whatsapp:{WHATSAPP_NUMMER}"]
+    assert cfg["approvals"]["plugin"]["targets"] == [{"channel": "whatsapp", "to": WHATSAPP_NUMMER}]
+    assert cfg["plugins"]["entries"]["whatsapp"] == {"enabled": True}
+    assert not {"matrix", "telegram"} & set(cfg["plugins"]["entries"])
+    # Die Nummer kommt nur aus der Umgebung und steht nie in einer Datei des Repos (hier: die Vorlagen).
+    assert WHATSAPP_NUMMER not in (WURZEL / "config" / "openclaw.json5.tmpl").read_text(encoding="utf-8")
+    assert WHATSAPP_NUMMER in text  # nur als Wert von allowFrom/targets, aus der Umgebung gerendert
+
+
+def test_whatsapp_eigene_nummer_schaltet_selbstgespraech_ein(tmp_path):
+    konfig = tmp_path / "fyos.yaml"
+    konfig.write_text("kanaele: {whatsapp: true}\nwhatsapp: {eigene_nummer: true}\n", encoding="utf-8")
+    ctx = render.lade_konfig(konfig, env=WHATSAPP_ENV)
+    render.rendere(WURZEL, ctx, tmp_path / "ziel", env=WHATSAPP_ENV)
+    cfg = json5lite.lade((tmp_path / "ziel" / "openclaw.json5").read_text(encoding="utf-8"))
+    assert cfg["channels"]["whatsapp"]["selfChatMode"] is True
+    assert cfg["channels"]["whatsapp"]["allowFrom"] == [WHATSAPP_NUMMER]  # weiterhin nur der Besitzer
+
+
+def test_alle_drei_kanaele_zusammen(tmp_path):
+    env = {**TELEGRAM_ENV, **WHATSAPP_ENV}
+    cfg, _ = _kanaele(tmp_path, "{matrix: true, telegram: true, whatsapp: true}",
+                      matrix_id="@alex:matrix.example.com", env=env)
+    assert set(cfg["channels"]) == {"matrix", "telegram", "whatsapp"}
+    assert [b["match"]["channel"] for b in cfg["bindings"]] == ["matrix", "telegram", "whatsapp"]
+    assert cfg["commands"]["ownerAllowFrom"] == [
+        "matrix:@alex:matrix.example.com", "telegram:424242424", f"whatsapp:{WHATSAPP_NUMMER}"]
+    assert [t["channel"] for t in cfg["approvals"]["plugin"]["targets"]] == ["matrix", "telegram", "whatsapp"]
+    assert {k for k in cfg["plugins"]["entries"] if k in ("matrix", "telegram", "whatsapp")} == {
+        "matrix", "telegram", "whatsapp"}
+
+
+def test_telegram_allein_bleibt_wie_zuvor_mit_whatsapp_im_code(tmp_path):
+    cfg, _ = _kanaele(tmp_path, "{telegram: true}")
+    assert set(cfg["channels"]) == {"telegram"}
+    assert "whatsapp" not in cfg["plugins"]["entries"]
+
+
+@pytest.mark.parametrize("nummer, meldung", [
+    ("", "FYOS_APPROVER_WHATSAPP_NUMBER fehlt"),
+    ("4915100000000", "internationalen Format"),            # ohne +
+    ("015100000000", "internationalen Format"),             # nationale Schreibweise
+    ("+49 151 00000000", "internationalen Format"),         # Leerzeichen
+    ("+49-151-00000000", "internationalen Format"),
+    ("+0123456789", "internationalen Format"),              # Ländervorwahl nie 0
+    ("+49151", "internationalen Format"),                   # zu kurz
+    ("+4915100000000000000", "internationalen Format"),     # zu lang
+    ("+4915100000000\n", "internationalen Format"),
+    ("Alex", "internationalen Format"),                     # Name statt Nummer
+])
+def test_whatsapp_ohne_brauchbare_nummer_bricht_ab(tmp_path, nummer, meldung):
+    konfig = tmp_path / "fyos.yaml"
+    konfig.write_text("kanaele: {whatsapp: true}\n", encoding="utf-8")
+    with pytest.raises(render.RenderFehler, match=meldung) as fehler:
+        render.lade_konfig(konfig, env={**WHATSAPP_ENV, "FYOS_APPROVER_WHATSAPP_NUMBER": nummer})
+    if nummer:
+        assert nummer.strip() not in str(fehler.value)  # die Meldung nennt die Variable, nie den Wert
+
+
+def test_cli_meldet_fehlende_whatsapp_nummer(tmp_path, monkeypatch, capsys):
+    konfig = tmp_path / "fyos.yaml"
+    konfig.write_text("kanaele: {whatsapp: true}\n", encoding="utf-8")
+    for k, v in ENV.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.delenv("FYOS_APPROVER_WHATSAPP_NUMBER", raising=False)
+    assert render.main(["--config", str(konfig), "--ziel", str(tmp_path / "ziel")]) == 1
+    assert "FYOS_APPROVER_WHATSAPP_NUMBER fehlt" in capsys.readouterr().err
+
+
+def test_dockerfile_installiert_whatsapp_festgenagelt_wie_matrix():
+    dockerfile = (WURZEL / "openclaw" / "Dockerfile").read_text(encoding="utf-8")
+    assert re.search(r"\*,matrix,\*\)[^;]*@openclaw/matrix@2026\.9\.7", dockerfile)
+    assert re.search(r"\*,whatsapp,\*\)[^;]*@openclaw/whatsapp@2026\.9\.7", dockerfile)
+    # Ein Kopiervorgang nach allen Installationen: matrix und whatsapp teilen sich ~/.openclaw/npm.
+    assert dockerfile.count("cp -a /home/node/.openclaw/npm/.") == 1
 
 
 def test_fehlende_umgebung_ist_ein_fehler(tmp_path):

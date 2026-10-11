@@ -6,7 +6,7 @@ import {ReaktionsSpeicher, starte_matrix_reaktionen} from './matrix-reaktionen.m
 export default definePluginEntry({
   id: 'fyos-freigabe-chat',
   name: 'FYOS Freigabe im Chat',
-  description: 'Die Chat-, Matrix- und Telegram-Antwort des Besitzers entscheidet eine offene Freigabe, ohne Modellaufruf',
+  description: 'Die Chat-, Matrix-, Telegram- und WhatsApp-Antwort des Besitzers entscheidet eine offene Freigabe, ohne Modellaufruf',
   register(api, config) {
     // Ohne Vorgangs-Dienst gibt es nichts zu entscheiden: das Plugin bleibt passiv.
     if (!process.env.FYOS_VORGAENGE_URL) {

@@ -9,10 +9,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
 import {
-  EIGENE, ERLAUBT, RPC_PFAD, VORGABEN, agentAusSchluessel, cronEreignis, erzeugeLaeufe, erzeugeRpcHandler,
-  erzeugeSender, erzeugeWarteschlange, erzeugeWerkzeuge, fehlerText, huellenZiel, hubZiel, idTeil, leseSkill,
-  modellEreignis, registerBruecke, signatur, sitzungsEreignis, sitzungsHash, skillEreignis, vorschlagEreignis,
-  werkzeugEreignis,
+  EIGENE, ERLAUBT, RPC_PFAD, VORGABEN, agentAusSchluessel, agentKennung, cronEreignis, erzeugeLaeufe, erzeugeRpcHandler,
+  erzeugeSender, erzeugeWarteschlange, erzeugeWerkzeuge, fehlerText, huellenZiel, hubZiel, idTeil, kanalMitteilen,
+  kanalStand, leseSkill, modellEreignis, registerBruecke, signatur, sitzungsEreignis, sitzungsHash, skillEreignis,
+  vorgangAusSchluessel, vorgangSenden, vorgangsSchluessel, vorschlagEreignis, wecken, werkzeugEreignis,
 } from './bruecke.mjs';
 
 const uhr = () => 1_700_000_000_000;
@@ -34,7 +34,8 @@ test('ein Werkzeugaufruf wird zu Name, Dauer und Ergebnis, ohne Argumente und Er
     {uhr},
   );
   assert.deepEqual(e, {art: 'werkzeug', zeit: uhr(), werkzeug: 'web_fetch', ok: true, dauer_ms: 42, fehler: undefined,
-                       agent: 'main', sitzung: sitzungsHash('agent:main:matrix:raum'), kanal: 'matrix'});
+                       agent: 'main', sitzung: sitzungsHash('agent:main:matrix:raum'), vorgang: undefined,
+                       kanal: 'matrix'});
   assert.ok(!JSON.stringify(e).includes('GEHEIM'));
   assert.ok(!JSON.stringify(e).includes('raum'), 'Sitzungsschlüssel nur gehasht');
   assert.equal(e.sitzung.length, 12);
@@ -365,9 +366,239 @@ test('fyos.skill.lesen liest nur Dateien, die OpenClaw als Skill listet', async 
 
 test('die Liste enthält nur Lesen und Workboard-Pflege, keine Steuerung des Agenten', () => {
   for (const m of ERLAUBT) {
-    assert.ok(/^(workboard\.(boards\.(list|upsert)|cards\.(list|create|update|move|comment|archive))|skills\.status|cron\.(list|runs|status)|usage\.(cost|status)|health)$/.test(m), m);
+    assert.ok(/^(workboard\.(boards\.(list|upsert)|cards\.(list|create|update|move|comment|archive))|skills\.status|cron\.(list|runs|status)|usage\.(cost|status)|health|memory\.search|sessions\.(list|describe)|last-heartbeat|progressCard\.get|tools\.effective|doctor\.memory\.status|agents\.list|voicewake\.routing\.get|tts\.status)$/.test(m), m);
   }
-  assert.deepEqual([...EIGENE].sort(), ['fyos.bruecke.status', 'fyos.skill.lesen']);
+  assert.deepEqual([...EIGENE].sort(), ['fyos.bruecke.status', 'fyos.kanal.mitteilen', 'fyos.skill.lesen',
+                                        'fyos.vorgang.senden', 'fyos.wecken']);
+});
+
+test('die lesenden Methoden gehen durch die Route, Schreibendes bleibt zu', async () => {
+  const dispatch = dispatchAttrappe();
+  const handler = erzeugeRpcHandler({dispatch, status: () => ({})});
+  for (const m of ['memory.search', 'sessions.list', 'sessions.describe', 'last-heartbeat', 'progressCard.get',
+                   'tools.effective', 'doctor.memory.status', 'agents.list', 'voicewake.routing.get', 'tts.status']) {
+    const r = antwortAttrappe();
+    await handler(anfrage('POST', {method: m, params: {}}), r);
+    assert.equal(r.statusCode, 200, m);
+  }
+  for (const verboten of ['sessions.delete', 'sessions.patch', 'chat.send', 'wake', 'progressCard.put', 'tts.enable',
+                          'agents.create', 'doctor.memory.resetDreamDiary']) {
+    const r = antwortAttrappe();
+    await handler(anfrage('POST', {method: verboten, params: {}}), r);
+    assert.equal(r.statusCode, 403, verboten);
+  }
+  assert.equal(dispatch.aufrufe.length, 10);
+});
+
+// ── Wecken und Vorgangssitzungen ────────────────────────────────────────────────────────────
+
+test('agentKennung: Aufruf vor Konfiguration vor FYOS_AGENT vor main, ungültig wird abgelehnt', () => {
+  assert.equal(agentKennung('', '', {}), 'main');
+  assert.equal(agentKennung('', '', {FYOS_AGENT: 'wache'}), 'wache');
+  assert.equal(agentKennung('', 'stand', {FYOS_AGENT: 'wache'}), 'stand');
+  assert.equal(agentKennung('direkt', 'stand', {FYOS_AGENT: 'wache'}), 'direkt');
+  assert.throws(() => agentKennung('a:b', '', {}), {status: 400});
+  assert.throws(() => agentKennung('../x', '', {}), {status: 400});
+});
+
+test('Sitzungsschlüssel eines Vorgangs und seine Umkehrung', () => {
+  assert.equal(vorgangsSchluessel('inc-1234', 'wache'), 'agent:wache:vorgang:INC-1234');
+  assert.throws(() => vorgangsSchluessel('keine nummer', 'wache'), {status: 400});
+  assert.throws(() => vorgangsSchluessel('', 'wache'), {status: 400});
+  assert.deepEqual(vorgangAusSchluessel('agent:wache:vorgang:INC-1234'), {agent: 'wache', vorgang: 'INC-1234'});
+  assert.deepEqual(vorgangAusSchluessel('agent:wache:vorgang:inc-1234'), {agent: 'wache', vorgang: 'INC-1234'});
+  assert.equal(vorgangsSchluessel('wb-1a2b3c4d', 'wache'), 'agent:wache:vorgang:WB-1A2B3C4D');
+  assert.deepEqual(vorgangAusSchluessel('agent:wache:vorgang:wb-1a2b3c4d'), {agent: 'wache', vorgang: 'WB-1A2B3C4D'});
+  assert.throws(() => vorgangsSchluessel('INC-12345678901234567', 'wache'), {status: 400});
+  assert.equal(vorgangAusSchluessel('agent:wache:main'), null);
+  assert.equal(vorgangAusSchluessel('agent:wache:vorgang:nix'), null);
+  assert.equal(vorgangAusSchluessel(undefined), null);
+});
+
+test('fyos.wecken: ein Vorgang weckt seine Sitzung, ohne Ziel die Hauptsitzung, nur über wake', async () => {
+  const dispatch = dispatchAttrappe();
+  const mit = await wecken({text: 'Neuer Kommentar', vorgang: 'INC-7'}, dispatch, {agent: 'wache'});
+  assert.deepEqual(mit, {geweckt: true, modus: 'jetzt', agent: 'wache', sitzung: 'agent:wache:vorgang:INC-7'});
+  assert.deepEqual(dispatch.aufrufe.at(-1), {methode: 'wake', params: {
+    mode: 'now', text: 'Neuer Kommentar', agentId: 'wache', sessionKey: 'agent:wache:vorgang:INC-7'}});
+  const ohne = await wecken({text: 'Los', modus: 'naechster'}, dispatch, {agent: 'wache'});
+  assert.deepEqual(ohne, {geweckt: true, modus: 'naechster', agent: 'wache', sitzung: 'agent:wache:main'});
+  assert.deepEqual(dispatch.aufrufe.at(-1), {methode: 'wake', params: {mode: 'next-heartbeat', text: 'Los', agentId: 'wache'}});
+  await wecken({text: 'Los', sitzung: 'agent:wache:main'}, dispatch, {agent: 'wache'});
+  assert.equal(dispatch.aufrufe.at(-1).params.sessionKey, 'agent:wache:main');
+  await wecken({text: 'a\u0000b', sitzung: 'agent:wache:vorgang:INC-1', agent: 'andere'}, dispatch, {agent: 'wache'});
+  assert.equal(dispatch.aufrufe.at(-1).params.text, 'a b');
+  assert.equal(dispatch.aufrufe.at(-1).params.agentId, 'andere');
+});
+
+test('fyos.wecken weckt keine fremden Sitzungen und verlangt Text und gültigen Modus', async () => {
+  const dispatch = dispatchAttrappe();
+  for (const sitzung of ['agent:wache:telegram:direct:4711', 'agent:wache:cron:abc', 'main', 'agent:wache:vorgang:x']) {
+    await assert.rejects(wecken({text: 'x', sitzung}, dispatch, {agent: 'wache'}), {status: 400}, sitzung);
+  }
+  await assert.rejects(wecken({text: '  '}, dispatch), {status: 400});
+  await assert.rejects(wecken({}, dispatch), {status: 400});
+  await assert.rejects(wecken({text: 'x', modus: 'sofort'}, dispatch), {status: 400});
+  await assert.rejects(wecken({text: 'x', vorgang: 'zu kurz'}, dispatch), {status: 400});
+  assert.equal(dispatch.aufrufe.length, 0, 'nichts erreicht das Gateway');
+  const lang = await wecken({text: 'y'.repeat(9000), vorgang: 'INC-1'}, dispatch);
+  assert.equal(dispatch.aufrufe[0].params.text.length, 4000);
+  assert.equal(lang.agent, 'main');
+});
+
+test('fyos.wecken: ein Fehler des Gateways kommt mit passendem Status zurück', async () => {
+  const dispatch = dispatchAttrappe({wake: {ok: false, error: {code: 'UNAVAILABLE', message: 'cron aus'}}});
+  await assert.rejects(wecken({text: 'x'}, dispatch), {status: 503, rpcCode: 'UNAVAILABLE'});
+  const ohneAntwort = dispatchAttrappe({wake: undefined});
+  await assert.rejects(wecken({text: 'x'}, ohneAntwort), {status: 503});
+});
+
+test('fyos.vorgang.senden: Nachricht in die Vorgangssitzung, ohne Zustellung an einen Kanal', async () => {
+  const dispatch = dispatchAttrappe({'chat.send': {ok: true, payload: {runId: 'r-1', status: 'started'}}});
+  const antwort = await vorgangSenden({vorgang: 'inc-42', text: 'Berta hat kommentiert', schluessel: 'ev-1'}, dispatch,
+                                      {agent: 'wache'});
+  assert.deepEqual(antwort, {gesendet: true, agent: 'wache', sitzung: 'agent:wache:vorgang:INC-42', lauf: 'r-1',
+                             status: 'started'});
+  assert.deepEqual(dispatch.aufrufe[0], {methode: 'chat.send', params: {
+    sessionKey: 'agent:wache:vorgang:INC-42', agentId: 'wache', message: 'Berta hat kommentiert', idempotencyKey: 'ev-1',
+    deliver: false}});
+  await vorgangSenden({vorgang: 'INC-42', text: 'x'}, dispatch, {agent: 'wache', neueId: () => 'zufall'});
+  assert.equal(dispatch.aufrufe[1].params.idempotencyKey, 'fyos-zufall');
+  await assert.rejects(vorgangSenden({vorgang: 'INC-42', text: 'x', schluessel: 'a b'}, dispatch), {status: 400});
+  await assert.rejects(vorgangSenden({text: 'x'}, dispatch), {status: 400});
+  await assert.rejects(vorgangSenden({vorgang: 'INC-42'}, dispatch), {status: 400});
+  assert.equal(dispatch.aufrufe.length, 2);
+});
+
+test('die Route beantwortet fyos.wecken und fyos.vorgang.senden und meldet Fehler als HTTP-Status', async () => {
+  const dispatch = dispatchAttrappe({'chat.send': {ok: true, payload: {runId: 'r-2', status: 'started'}}});
+  const handler = erzeugeRpcHandler({dispatch, status: () => ({}), agent: 'wache'});
+  const a = antwortAttrappe();
+  await handler(anfrage('POST', {id: 'w1', method: 'fyos.wecken', params: {text: 'hallo', vorgang: 'INC-3'}}), a);
+  assert.equal(a.statusCode, 200);
+  assert.deepEqual(a.json, {id: 'w1', ok: true, payload: {geweckt: true, modus: 'jetzt', agent: 'wache',
+                                                          sitzung: 'agent:wache:vorgang:INC-3'}});
+  const b = antwortAttrappe();
+  await handler(anfrage('POST', {method: 'fyos.vorgang.senden', params: {vorgang: 'INC-3', text: 'hallo'}}), b);
+  assert.equal(b.statusCode, 200);
+  assert.equal(b.json.payload.lauf, 'r-2');
+  const c = antwortAttrappe();
+  await handler(anfrage('POST', {method: 'fyos.wecken', params: {}}), c);
+  assert.equal(c.statusCode, 400);
+  assert.equal(c.json.error.code, 'INVALID_REQUEST');
+  const d = antwortAttrappe();
+  await handler(anfrage('POST', {method: 'fyos.wecken', params: {text: 'x', sitzung: 'agent:wache:telegram:direct:1'}}), d);
+  assert.equal(d.statusCode, 400);
+  assert.deepEqual(dispatch.aufrufe.map((x) => x.methode), ['wake', 'chat.send']);
+});
+
+test('Ereignisse zu Vorgangssitzungen tragen die Vorgangsnummer, sonst nichts aus dem Schlüssel', () => {
+  const s = sitzungsEreignis('beginn', {sessionKey: 'agent:wache:vorgang:inc-5'}, {}, {uhr});
+  assert.equal(s.vorgang, 'INC-5');
+  assert.equal(s.agent, 'wache');
+  assert.equal(sitzungsEreignis('beginn', {sessionKey: 'agent:wache:main'}, {}, {uhr}).vorgang, undefined);
+  const laeufe = erzeugeLaeufe({uhr});
+  laeufe.verarbeite({stream: 'lifecycle', runId: 'r', sessionKey: 'agent:wache:vorgang:inc-5', data: {phase: 'start'}});
+  const lauf = laeufe.verarbeite({stream: 'lifecycle', runId: 'r', sessionKey: 'agent:wache:vorgang:inc-5', data: {phase: 'end'}});
+  assert.equal(lauf.vorgang, 'INC-5');
+  assert.ok(!JSON.stringify(lauf).includes('vorgang:inc-5'));
+  assert.equal(modellEreignis({sessionKey: 'agent:wache:vorgang:inc-5'}, {}, {uhr}).vorgang, 'INC-5');
+  assert.equal(werkzeugEreignis({toolName: 'read'}, {sessionKey: 'agent:wache:vorgang:inc-5'}, {uhr}).vorgang, 'INC-5');
+});
+
+// ── Kanäle: Stand und dringende Mitteilung ──────────────────────────────────────────────────
+
+const KANAL_KONFIG = {channels: {telegram: {enabled: true}, whatsapp: {enabled: true}, matrix: {enabled: true}}};
+const KANAL_UMGEBUNG = {
+  OPENCLAW_GATEWAY_TOKEN: 'geheim-token', FYOS_APPROVER_TELEGRAM_ID: '4711',
+  FYOS_APPROVER_WHATSAPP_NUMBER: '+4915100000000', FYOS_APPROVER_MATRIX_ID: '@besitzer:example.org',
+};
+
+function sendeAttrappe(antworten = {}) {
+  const aufrufe = [];
+  const fn = async (url, init) => {
+    const koerper = JSON.parse(init.body);
+    aufrufe.push({url, init, koerper});
+    const soll = antworten[koerper.args.channel] ?? {status: 200, body: {ok: true}};
+    return {ok: soll.status < 400, status: soll.status, json: async () => soll.body};
+  };
+  fn.aufrufe = aufrufe;
+  return fn;
+}
+
+test('kanalStand nennt nur Namen und Wahrheitswerte, nie die Adresse des Besitzers', () => {
+  const stand = kanalStand(
+    {channels: {telegram: {enabled: true}, whatsapp: {enabled: true}}},
+    {FYOS_APPROVER_TELEGRAM_ID: '4711'});
+  assert.deepEqual(stand, {
+    telegram: {an: true, ziel: true, bereit: true},
+    whatsapp: {an: true, ziel: false, bereit: false},
+    matrix: {an: false, ziel: false, bereit: false},
+  });
+  assert.ok(!JSON.stringify(stand).includes('4711'));
+  assert.deepEqual(kanalStand({}, {}).telegram, {an: false, ziel: false, bereit: false});
+});
+
+test('eine Mitteilung geht über das Gateway an den ersten bereiten Kanal des Besitzers', async () => {
+  const fetchImpl = sendeAttrappe();
+  const antwort = await kanalMitteilen({text: 'Notfall: Platte voll'}, {config: KANAL_KONFIG, env: KANAL_UMGEBUNG, fetchImpl});
+  assert.deepEqual(antwort, {gesendet: true, kanal: 'telegram', gescheitert: []});
+  assert.equal(fetchImpl.aufrufe.length, 1);
+  const {url, init, koerper} = fetchImpl.aufrufe[0];
+  assert.equal(url, 'http://127.0.0.1:18789/tools/invoke');
+  assert.equal(init.headers.Authorization, 'Bearer geheim-token');
+  assert.deepEqual(koerper, {tool: 'message', args: {action: 'send', channel: 'telegram', target: '4711',
+                                                      message: 'Notfall: Platte voll'}});
+});
+
+test('scheitert ein Kanal, kommt der nächste dran; das Token steht in keiner Antwort', async () => {
+  const fetchImpl = sendeAttrappe({telegram: {status: 502, body: {ok: false, error: {message: 'Bearer geheim-token abgelehnt'}}}});
+  const antwort = await kanalMitteilen({text: 'dringend'}, {config: KANAL_KONFIG, env: KANAL_UMGEBUNG, fetchImpl});
+  assert.equal(antwort.kanal, 'whatsapp');
+  assert.deepEqual(antwort.gescheitert.map((g) => g.kanal), ['telegram']);
+  assert.ok(!JSON.stringify(antwort).includes('geheim-token'));
+  assert.equal(fetchImpl.aufrufe[1].koerper.args.target, '+4915100000000');
+});
+
+test('ein gewünschter Kanal wird allein versucht, Matrix mit der Benutzerkennung', async () => {
+  const fetchImpl = sendeAttrappe();
+  const antwort = await kanalMitteilen({text: 'hallo', kanal: 'matrix'}, {config: KANAL_KONFIG, env: KANAL_UMGEBUNG, fetchImpl});
+  assert.equal(antwort.kanal, 'matrix');
+  assert.equal(fetchImpl.aufrufe.length, 1);
+  assert.equal(fetchImpl.aufrufe[0].koerper.args.target, '@besitzer:example.org');
+  await assert.rejects(kanalMitteilen({text: 'x', kanal: 'sms'}, {config: KANAL_KONFIG, env: KANAL_UMGEBUNG, fetchImpl}), {status: 400});
+});
+
+test('ohne Text, ohne Token oder ohne bereiten Kanal gibt es einen Fehler und keinen Aufruf', async () => {
+  const fetchImpl = sendeAttrappe();
+  await assert.rejects(kanalMitteilen({text: '  '}, {config: KANAL_KONFIG, env: KANAL_UMGEBUNG, fetchImpl}), {status: 400});
+  await assert.rejects(kanalMitteilen({text: 'x'}, {config: KANAL_KONFIG, env: {...KANAL_UMGEBUNG, OPENCLAW_GATEWAY_TOKEN: ''}, fetchImpl}), {status: 503});
+  await assert.rejects(kanalMitteilen({text: 'x'}, {config: {}, env: KANAL_UMGEBUNG, fetchImpl}), {status: 503});
+  await assert.rejects(kanalMitteilen({text: 'x'}, {config: KANAL_KONFIG, env: {OPENCLAW_GATEWAY_TOKEN: 't'}, fetchImpl}), {status: 503});
+  assert.equal(fetchImpl.aufrufe.length, 0);
+});
+
+test('scheitern alle Kanäle, meldet die Route 503 ohne Token und Adresse', async () => {
+  const fetchImpl = async () => { throw new Error('verbindung geheim-token verloren'); };
+  const handler = erzeugeRpcHandler({
+    dispatch: dispatchAttrappe(), status: () => ({}),
+    mitteilen: (params) => kanalMitteilen(params, {config: KANAL_KONFIG, env: KANAL_UMGEBUNG, fetchImpl}),
+  });
+  const r = antwortAttrappe();
+  await handler(anfrage('POST', {method: 'fyos.kanal.mitteilen', params: {text: 'x'}}), r);
+  assert.equal(r.statusCode, 503);
+  assert.ok(!r.text.includes('geheim-token'));
+  assert.ok(!r.text.includes('4711'));
+  const ok = antwortAttrappe();
+  const handler2 = erzeugeRpcHandler({dispatch: dispatchAttrappe(), status: () => ({}),
+                                      mitteilen: (params) => kanalMitteilen(params, {config: KANAL_KONFIG, env: KANAL_UMGEBUNG, fetchImpl: sendeAttrappe()})});
+  await handler2(anfrage('POST', {id: 'm1', method: 'fyos.kanal.mitteilen', params: {text: 'x'}}), ok);
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.json.payload.kanal, 'telegram');
+  const ohne = antwortAttrappe();
+  await erzeugeRpcHandler({dispatch: dispatchAttrappe(), status: () => ({})})(
+    anfrage('POST', {method: 'fyos.kanal.mitteilen', params: {text: 'x'}}), ohne);
+  assert.equal(ohne.statusCode, 503);
 });
 
 // ── Anmeldung im Gateway ────────────────────────────────────────────────────────────────────
@@ -434,6 +665,8 @@ test('Ende zu Ende: Inhalte erreichen den Hub nie, der Kopf trägt Stand und Plu
     assert.deepEqual(koerper.ereignisse.map((e) => e.art).sort(), ['cron', 'hinweis', 'lauf', 'modell', 'werkzeug']);
     assert.equal(koerper.bruecke.instanz, 'agent-0');
     assert.deepEqual(koerper.bruecke.plugins, [{id: 'fyos-bruecke', an: true}, {id: 'fyos-speed-router', an: false}]);
+    assert.deepEqual(Object.keys(koerper.bruecke.kanaele), ['telegram', 'whatsapp', 'matrix']);
+    assert.equal(koerper.bruecke.kanaele.telegram.an, false);
     assert.equal(init.headers['X-FYOS-Signatur'], signatur('geheim-test', init.headers['X-FYOS-Zeit'], init.body));
     const stand = a.methoden['fyos.bruecke.status'].fn();
     assert.equal(stand.laeuft, true);
@@ -475,7 +708,7 @@ test('Manifest: Dispatch-Vertrag gesetzt, jede Einstellung im Schema', () => {
   assert.equal(manifest.id, 'fyos-bruecke');
   assert.deepEqual(manifest.contracts.gatewayMethodDispatch, ['authenticated-request']);
   assert.equal(manifest.configSchema.additionalProperties, false);
-  for (const schluessel of [...Object.keys(VORGABEN), 'hubUrl']) {
+  for (const schluessel of [...Object.keys(VORGABEN), 'hubUrl', 'agentId']) {
     assert.ok(schluessel in manifest.configSchema.properties, schluessel);
   }
 });

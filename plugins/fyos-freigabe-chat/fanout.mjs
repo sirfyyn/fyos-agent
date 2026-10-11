@@ -5,8 +5,9 @@
  * wartende Anfrage sichtbar machen; eine Antwort kommt als Matrix-Reaktion oder
  * Chat-Text (Matrix oder Telegram) und trifft denselben PATCH wie jede andere Sicht.
  *
- * Kanaele: Matrix (Nachricht mit Reaktions-Knoepfen) und Telegram (Textnachricht an die Direktnachricht
- * des Besitzers; geantwortet wird per Text). Es genuegt, wenn ein Kanal zustellt.
+ * Kanaele: Matrix (Nachricht mit Reaktions-Knoepfen), Telegram (Textnachricht an die Direktnachricht
+ * des Besitzers; geantwortet wird per Text) und WhatsApp (Textnachricht ueber das Gateway selbst; geantwortet wird
+ * per Text). Es genuegt, wenn ein Kanal zustellt.
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
@@ -15,6 +16,10 @@ const MAX_BODY = 16 * 1024;
 const TELEGRAM_API = 'https://api.telegram.org';
 // Telegram erlaubt 4096 Zeichen je Nachricht; darunter bleiben.
 const TELEGRAM_MAX_ZEICHEN = 4000;
+// WhatsApp teilt lange Texte selbst (textChunkLimit 4000); ein Freigabebrief soll ohnehin eine Nachricht bleiben.
+const WHATSAPP_MAX_ZEICHEN = 4000;
+const WHATSAPP_NUMMER = /^\+[1-9]\d{6,14}$/;
+const GATEWAY_VORGABE = 'http://127.0.0.1:18789';
 const AKTIONSSICHT = /<!-- fyos-aktionsfreigabe-sicht:v1 -->\s*([\s\S]*?)\s*<!-- \/fyos-aktionsfreigabe-sicht:v1 -->/i;
 
 function text(value, max) {
@@ -77,6 +82,11 @@ export function telegram_text(anfrage) {
     `Antworte mit: genehmigt ${anfrage.ticket} · abgelehnt ${anfrage.ticket} · kommentar ${anfrage.ticket}: …`,
     'Die erste gueltige Antwort entscheidet; alle Sichten werden danach aktualisiert.',
   ].filter(Boolean).join('\n\n');
+}
+
+/** WhatsApp: wie Telegram reiner Text; die Reaktions-Knoepfe (Daumen) gibt es nur fuer native Freigaben. */
+export function whatsapp_text(anfrage) {
+  return telegram_text(anfrage);
 }
 
 export function matrix_aufloesung_text(aufloesung) {
@@ -202,13 +212,56 @@ export const sende_telegram_aufloesung = (aufloesung, optionen) =>
   sende_telegram_nachricht(matrix_aufloesung_text(aufloesung), optionen);
 
 /**
- * Stellt in allen eingerichteten Kanaelen zu. Ohne Telegram bleibt es beim bisherigen Weg (Matrix, auch bei
- * unvollstaendiger Konfiguration: dann ein Fehler). Ein gescheiterter Kanal wird protokolliert; es genuegt,
- * wenn ein Kanal zustellt.
+ * Eine Textnachricht an die Nummer des Besitzers. WhatsApp hat keine Bot-API: das Gateway haelt die gekoppelte
+ * Sitzung und ist der einzige Absender. Deshalb geht die Nachricht ueber seine eigene Schnittstelle fuer einzelne
+ * Werkzeuge (POST /tools/invoke, Werkzeug `message`, Aktion `send`) im selben Container, angemeldet mit dem
+ * Gateway-Token. Ohne gekoppelte Sitzung schlaegt der Aufruf fehl; das Gateway meldet es, und der Relay stellt in
+ * den anderen Kanaelen weiter zu. Das Token darf nie in einer Fehlermeldung oder im Log landen.
+ */
+export async function sende_whatsapp_nachricht(nachricht, optionen) {
+  const {whatsappNummer, gatewayToken, gatewayUrl = GATEWAY_VORGABE, fetchImpl = fetch} = optionen;
+  if (!whatsappNummer || !gatewayToken) throw new Error('WhatsApp-Fanout unvollstaendig konfiguriert');
+  if (!WHATSAPP_NUMMER.test(String(whatsappNummer))) throw new Error('WhatsApp-Fanout: Besitzer-Nummer ist keine Telefonnummer');
+  try {
+    const antwort = await fetchImpl(`${String(gatewayUrl).replace(/\/$/, '')}/tools/invoke`, {
+      method: 'POST',
+      headers: {Authorization: `Bearer ${gatewayToken}`, 'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        tool: 'message',
+        args: {
+          action: 'send',
+          channel: 'whatsapp',
+          target: String(whatsappNummer),
+          message: String(nachricht).slice(0, WHATSAPP_MAX_ZEICHEN),
+        },
+      }),
+    });
+    const koerper = await antwort.json().catch(() => ({}));
+    if (!antwort.ok || koerper?.ok === false) {
+      throw new Error(`WhatsApp HTTP ${antwort.status}: ${text(koerper?.error?.message ?? koerper?.error, 200)}`);
+    }
+    return {gesendet: true};
+  } catch (fehler) {
+    throw new Error(ohne_token(fehler?.message ?? fehler, gatewayToken));
+  }
+}
+
+export const sende_whatsapp_anfrage = (anfrage, optionen) =>
+  sende_whatsapp_nachricht(whatsapp_text(anfrage), optionen);
+
+/** Abschlussnachricht; WhatsApp hat hier keine Knoepfe, die zu entfernen waeren. */
+export const sende_whatsapp_aufloesung = (aufloesung, optionen) =>
+  sende_whatsapp_nachricht(matrix_aufloesung_text(aufloesung), optionen);
+
+/**
+ * Stellt in allen eingerichteten Kanaelen zu. Ohne Telegram und WhatsApp bleibt es beim bisherigen Weg (Matrix,
+ * auch bei unvollstaendiger Konfiguration: dann ein Fehler). Ein gescheiterter Kanal wird protokolliert; es
+ * genuegt, wenn ein Kanal zustellt.
  */
 async function stelle_zu(art, wert, optionen) {
   const telegram = Boolean(optionen.telegramToken && optionen.telegramChatId);
-  const matrix = !telegram || Boolean(optionen.homeserver);
+  const whatsapp = Boolean(optionen.whatsappNummer && optionen.gatewayToken);
+  const matrix = !(telegram || whatsapp) || Boolean(optionen.homeserver);
   const versuche = [];
   if (matrix) {
     versuche.push(['matrix', art === 'aufloesung'
@@ -217,6 +270,10 @@ async function stelle_zu(art, wert, optionen) {
   if (telegram) {
     versuche.push(['telegram', art === 'aufloesung'
       ? sende_telegram_aufloesung(wert, optionen) : sende_telegram_anfrage(wert, optionen)]);
+  }
+  if (whatsapp) {
+    versuche.push(['whatsapp', art === 'aufloesung'
+      ? sende_whatsapp_aufloesung(wert, optionen) : sende_whatsapp_anfrage(wert, optionen)]);
   }
   const ergebnisse = await Promise.allSettled(versuche.map(([, zustellung]) => zustellung));
   const geliefert = {};
@@ -268,17 +325,19 @@ export function erstelle_fanout_handler(optionen) {
       // Dieses Plugin darf keine beliebigen Kern-Genehmigungskarten erfinden.
       // Die native Karte entsteht ausschließlich aus OpenClaws `requireApproval`
       // beim echten, ticketgebundenen Tool-Call (fyos-prioritaet). Dieser Relay
-      // liefert die Matrix- und Telegram-Sicht derselben Akte.
+      // liefert die Matrix-, Telegram- und WhatsApp-Sicht derselben Akte.
       const geliefert = await stelle_zu(nutzlast.art, nutzlast.wert, optionen);
-      if (!geliefert.matrix && !geliefert.telegram) {
+      if (!geliefert.matrix && !geliefert.telegram && !geliefert.whatsapp) {
         antwort(res, 502, {ok: false, error: 'Fanout nicht zugestellt'});
         return true;
       }
-      // Das Antwortformat des reinen Matrix-Betriebs bleibt unveraendert; Telegram kommt unter eigenem Schluessel dazu.
+      // Das Antwortformat des reinen Matrix-Betriebs bleibt unveraendert; Telegram und WhatsApp kommen unter eigenem
+      // Schluessel dazu.
       const telegram = geliefert.telegram ? {telegram: geliefert.telegram} : {};
+      const whatsapp = geliefert.whatsapp ? {whatsapp: geliefert.whatsapp} : {};
       if (nutzlast.art === 'aufloesung') {
         antwort(res, 200, {ok: true, ticket: nutzlast.wert.ticket, entscheidung: nutzlast.wert.entscheidung,
-          ...geliefert.matrix, ...telegram});
+          ...geliefert.matrix, ...telegram, ...whatsapp});
         return true;
       }
       const anfrage = nutzlast.wert;
@@ -286,7 +345,7 @@ export function erstelle_fanout_handler(optionen) {
         try { await optionen.reaktionsspeicher?.merke_prompt({eventId: geliefert.matrix.event_id, ticket: anfrage.ticket, raum: geliefert.matrix.room_id}); }
         catch (fehler) { optionen.logger?.warn(`fyos-freigabe-speicher: ${String(fehler.message ?? fehler).slice(0, 200)}`); }
       }
-      antwort(res, 200, {ok: true, ticket: anfrage.ticket, ...geliefert.matrix, ...telegram});
+      antwort(res, 200, {ok: true, ticket: anfrage.ticket, ...geliefert.matrix, ...telegram, ...whatsapp});
     } catch (fehler) {
       optionen.logger?.warn(`fyos-freigabe-fanout: ${String(fehler.message ?? fehler).slice(0, 300)}`);
       antwort(res, 502, {ok: false, error: 'Fanout nicht zugestellt'});
@@ -298,6 +357,8 @@ export function erstelle_fanout_handler(optionen) {
 export function registerFanout(api, config = {}) {
   // Telegram nur, wenn der Kanal in der Konfiguration an ist; Token und Besitzer-ID kommen aus der Umgebung.
   const telegramAn = api.config?.channels?.telegram?.enabled === true;
+  // WhatsApp ebenso: Nummer des Besitzers aus der Umgebung; gesendet wird ueber das eigene Gateway (loopback).
+  const whatsappAn = api.config?.channels?.whatsapp?.enabled === true;
   api.registerHttpRoute({
     path: '/plugins/fyos-freigabe-chat/v1/requests', auth: 'plugin', match: 'exact',
     handler: erstelle_fanout_handler({
@@ -308,6 +369,9 @@ export function registerFanout(api, config = {}) {
       approverId: process.env.FYOS_APPROVER_MATRIX_ID || '',
       telegramToken: telegramAn ? process.env.OPENCLAW_TELEGRAM_TOKEN : undefined,
       telegramChatId: telegramAn ? process.env.FYOS_APPROVER_TELEGRAM_ID : undefined,
+      whatsappNummer: whatsappAn ? process.env.FYOS_APPROVER_WHATSAPP_NUMBER : undefined,
+      gatewayToken: whatsappAn ? process.env.OPENCLAW_GATEWAY_TOKEN : undefined,
+      gatewayUrl: `http://127.0.0.1:${process.env.OPENCLAW_GATEWAY_PORT || 18789}`,
       logger: api.logger,
       reaktionsspeicher: config.reaktionsspeicher,
     }),

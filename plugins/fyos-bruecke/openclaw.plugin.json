@@ -1,8 +1,8 @@
 {
   "id": "fyos-bruecke",
   "name": "FYOS Brücke",
-  "version": "0.1.0",
-  "description": "Koppelt das Gateway an den FYOS-Hub (fyos-os: docs/KOPPLUNG-OPENCLAW.md): Werkzeug- und Modellaufrufe, Läufe, Sitzungen, Cron und Skills als Ereignisse ohne Inhalte an den Hub; Workboard, Skills, Cron und Nutzung für den Hub über eine feste Methodenliste. Braucht FYOS_HUB_URL oder hubUrl.",
+  "version": "0.2.0",
+  "description": "Koppelt das Gateway an den FYOS-Hub (fyos-os: docs/KOPPLUNG-OPENCLAW.md): Werkzeug- und Modellaufrufe, Läufe, Sitzungen, Cron und Skills als Ereignisse ohne Inhalte an den Hub; Workboard, Skills, Cron, Nutzung und lesend Gedächtnis, Sitzungen und Agenten für den Hub über eine feste Methodenliste; der Hub kann den Agenten wecken (fyos.wecken) und in die Sitzung eines Vorgangs schreiben (fyos.vorgang.senden). Braucht FYOS_HUB_URL oder hubUrl.",
   "activation": { "onStartup": true },
   "contracts": { "gatewayMethodDispatch": ["authenticated-request"] },
   "configSchema": {
@@ -10,6 +10,7 @@
     "additionalProperties": false,
     "properties": {
       "hubUrl": { "type": "string", "description": "Basis-URL des Hubs, z. B. http://hub:8080 (Vorgabe: FYOS_HUB_URL ohne /mcp)" },
+      "agentId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", "description": "Kennung des Agenten, den der Hub weckt (Vorgabe: FYOS_AGENT, sonst main)" },
       "intervallSekunden": { "type": "number", "minimum": 1, "maximum": 300 },
       "lebenszeichenSekunden": { "type": "number", "minimum": 10, "maximum": 3600 },
       "warteschlangeMax": { "type": "integer", "minimum": 10, "maximum": 100000 },

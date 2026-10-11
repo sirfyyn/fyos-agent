@@ -2,7 +2,7 @@
   "id": "fyos-freigabe-chat",
   "name": "FYOS Freigabe im Chat",
   "version": "2026.9.19",
-  "description": "Die Chat-, Matrix- und Telegram-Antwort des Besitzers entscheidet eine offene Freigabe, ohne Modellaufruf. Braucht FYOS_VORGAENGE_URL.",
+  "description": "Die Chat-, Matrix-, Telegram- und WhatsApp-Antwort des Besitzers entscheidet eine offene Freigabe, ohne Modellaufruf. Braucht FYOS_VORGAENGE_URL.",
   "activation": { "onStartup": true },
   "configSchema": { "type": "object", "properties": {}, "additionalProperties": false }
 }

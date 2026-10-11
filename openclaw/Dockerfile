@@ -20,18 +20,23 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 python3-yaml \
     && rm -rf /var/lib/apt/lists/*
 
-# Zusaetzliche Kanaele, kommagetrennt (heute: matrix). Standard: keiner.
-#   docker build --build-arg FYOS_KANAELE=matrix -f openclaw/Dockerfile .
+# Zusaetzliche Kanaele, kommagetrennt (heute: matrix, whatsapp). Standard: keiner.
+#   docker build --build-arg FYOS_KANAELE=matrix,whatsapp -f openclaw/Dockerfile .
 # Aktiv wird ein Kanal erst, wenn fyos.yaml ihn unter kanaele setzt. Telegram steckt im Basisbild von
 # OpenClaw (Paket @openclaw/telegram, "included in OpenClaw") und braucht deshalb kein Build-Argument.
+# WhatsApp laeuft als Zusatzpaket (@openclaw/whatsapp, bringt Baileys mit) und wird wie Matrix auf die
+# Basisversion festgenagelt. Alle Pakete landen im selben Ordner ~/.openclaw/npm und werden danach einmal kopiert.
 # Der Ordner entsteht als root und gehoert dann node: unter /opt darf node nichts anlegen.
 ARG FYOS_KANAELE=""
 RUN mkdir -p /opt/openclaw-npm && chown node:node /opt/openclaw-npm
 USER node
 RUN case ",${FYOS_KANAELE}," in *,matrix,*) \
-         openclaw plugins install @openclaw/matrix@2026.9.7 \
-         && cp -a /home/node/.openclaw/npm/. /opt/openclaw-npm/ ;; \
-       esac
+         openclaw plugins install @openclaw/matrix@2026.9.7 ;; \
+       esac \
+    && case ",${FYOS_KANAELE}," in *,whatsapp,*) \
+         openclaw plugins install @openclaw/whatsapp@2026.9.7 ;; \
+       esac \
+    && if [ -d /home/node/.openclaw/npm ]; then cp -a /home/node/.openclaw/npm/. /opt/openclaw-npm/; fi
 
 USER root
 # Verhaltens-Plugins unter /opt/fyos/<id>. `openclaw/plugin-sdk/...` muss aufloesbar sein,

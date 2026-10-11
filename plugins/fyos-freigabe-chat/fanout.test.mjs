@@ -3,7 +3,7 @@ import test from 'node:test';
 import {Readable} from 'node:stream';
 import {
   erstelle_fanout_handler, matrix_text, normalisiere_anfrage, sende_matrix_anfrage, sende_telegram_nachricht,
-  telegram_text, token_stimmt,
+  sende_whatsapp_nachricht, telegram_text, token_stimmt, whatsapp_text,
 } from './fanout.mjs';
 import {ReaktionsSpeicher} from './matrix-reaktionen.mjs';
 
@@ -312,4 +312,157 @@ test('Beschluss mit Matrix und Telegram: beide Kanäle, die gemerkte Matrix-Frag
   assert.deepEqual(JSON.parse(res.body), {ok: true, ticket: 'CHG-1', entscheidung: 'erteilt', raeume: 1, telegram: {message_id: 9}});
   assert.equal(speicher.prompt('$frage'), null);
   assert.equal(rufe.length, 2);
+});
+
+// ── WhatsApp als dritter Kanal ───────────────────────────────────────────────
+
+const GATEWAY_TOKEN = 'gateway-geheim-0123456789abcdef';
+const NUMMER = '+4915100000000';
+const whatsapp_optionen = {whatsappNummer: NUMMER, gatewayToken: GATEWAY_TOKEN, gatewayUrl: 'http://127.0.0.1:18789'};
+const gateway_ok = () => new Response(JSON.stringify({ok: true, result: {content: []}}));
+/** Antwortet je nach Ziel wie das Gateway (WhatsApp), Telegram oder Matrix. */
+const alle_kanaele = (rufe, ausfall = []) => async (url, init = {}) => {
+  if (url.includes('/tools/invoke')) {
+    rufe.push({url, init});
+    if (ausfall.includes('whatsapp')) {
+      return new Response(JSON.stringify({ok: false, error: {type: 'tool_error', message: 'no active whatsapp listener'}}), {status: 500});
+    }
+    return gateway_ok();
+  }
+  return kanal_attrappe(rufe, ausfall)(url, init);
+};
+
+test('WhatsApp-Text ist reiner Text mit den Textantworten, ohne Matrix-Knöpfe', () => {
+  const text = whatsapp_text(normalisiere_anfrage({ticket: 'chg-42', titel: 'Push nach main', beschreibung: 'Commit abc'}));
+  assert.match(text, /Freigabe angefragt: CHG-42/);
+  assert.match(text, /genehmigt CHG-42 · abgelehnt CHG-42 · kommentar CHG-42/);
+  assert.doesNotMatch(text, /✅|❌|➕|Reagiere|`/);
+});
+
+test('WhatsApp: eine Textnachricht über das Gateway an die Nummer des Besitzers, das Token nur im Kopf', async () => {
+  const rufe = [];
+  const ergebnis = await sende_whatsapp_nachricht('Hallo', {
+    ...whatsapp_optionen, fetchImpl: async (url, init) => { rufe.push({url, init}); return gateway_ok(); },
+  });
+  assert.deepEqual(ergebnis, {gesendet: true});
+  assert.equal(rufe.length, 1);
+  assert.equal(rufe[0].url, 'http://127.0.0.1:18789/tools/invoke');
+  assert.equal(rufe[0].init.method, 'POST');
+  assert.equal(rufe[0].init.headers.Authorization, `Bearer ${GATEWAY_TOKEN}`);
+  assert.deepEqual(JSON.parse(rufe[0].init.body), {
+    tool: 'message', args: {action: 'send', channel: 'whatsapp', target: NUMMER, message: 'Hallo'},
+  });
+  assert.ok(!rufe[0].init.body.includes(GATEWAY_TOKEN));
+});
+
+test('WhatsApp kürzt zu lange Nachrichten', async () => {
+  let gesendet = '';
+  await sende_whatsapp_nachricht('x'.repeat(9000), {
+    ...whatsapp_optionen, fetchImpl: async (_url, init) => { gesendet = JSON.parse(init.body).args.message; return gateway_ok(); },
+  });
+  assert.equal(gesendet.length, 4000);
+});
+
+test('WhatsApp: Fehlermeldungen nennen nie das Gateway-Token', async () => {
+  const abgelehnt = sende_whatsapp_nachricht('x', {
+    ...whatsapp_optionen,
+    fetchImpl: async () => new Response(JSON.stringify({ok: false, error: {type: 'tool_error', message: 'no active whatsapp listener'}}), {status: 500}),
+  });
+  await assert.rejects(abgelehnt, (fehler) => {
+    assert.match(fehler.message, /WhatsApp HTTP 500: no active whatsapp listener/);
+    assert.ok(!fehler.message.includes(GATEWAY_TOKEN));
+    return true;
+  });
+  const netz = sende_whatsapp_nachricht('x', {
+    ...whatsapp_optionen, fetchImpl: async () => { throw new TypeError(`connect failed, Authorization: Bearer ${GATEWAY_TOKEN}`); },
+  });
+  await assert.rejects(netz, (fehler) => {
+    assert.ok(!fehler.message.includes(GATEWAY_TOKEN));
+    assert.match(fehler.message, /\*\*\*/);
+    return true;
+  });
+});
+
+test('WhatsApp: unvollständige oder falsche Konfiguration stellt nichts zu', async () => {
+  let fetches = 0;
+  const fetchImpl = async () => { fetches += 1; return gateway_ok(); };
+  await assert.rejects(sende_whatsapp_nachricht('x', {whatsappNummer: NUMMER, fetchImpl}), /unvollstaendig/);
+  await assert.rejects(sende_whatsapp_nachricht('x', {gatewayToken: GATEWAY_TOKEN, fetchImpl}), /unvollstaendig/);
+  await assert.rejects(sende_whatsapp_nachricht('x', {...whatsapp_optionen, whatsappNummer: 'Alex', fetchImpl}), /keine Telefonnummer/);
+  await assert.rejects(sende_whatsapp_nachricht('x', {...whatsapp_optionen, whatsappNummer: '015100000000', fetchImpl}), /keine Telefonnummer/);
+  assert.equal(fetches, 0);
+});
+
+test('Relay nur mit WhatsApp: eine Nachricht über das Gateway, Matrix und Telegram bleiben unberührt', async () => {
+  const rufe = [];
+  const handler = erstelle_fanout_handler({relayToken: 'relay', ...whatsapp_optionen, fetchImpl: alle_kanaele(rufe)});
+  const res = antwort_attrappe();
+  await handler(relay_anfrage({ticket: 'CHG-1', titel: 'x'}), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), {ok: true, ticket: 'CHG-1', whatsapp: {gesendet: true}});
+  assert.equal(rufe.length, 1);
+  assert.match(JSON.parse(rufe[0].init.body).args.message, /genehmigt CHG-1/);
+});
+
+test('Relay mit Matrix, Telegram und WhatsApp stellt in allen drei Kanälen zu', async () => {
+  const rufe = [];
+  const speicher = new ReaktionsSpeicher({jetzt: () => 10});
+  const handler = erstelle_fanout_handler({
+    relayToken: 'relay', ...matrix_optionen, ...telegram_optionen, ...whatsapp_optionen,
+    reaktionsspeicher: speicher, fetchImpl: alle_kanaele(rufe),
+  });
+  const res = antwort_attrappe();
+  await handler(relay_anfrage({ticket: 'CHG-1', titel: 'x'}), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), {
+    ok: true, ticket: 'CHG-1', room_id: '!raum:matrix', event_id: '$event',
+    telegram: {message_id: 9}, whatsapp: {gesendet: true},
+  });
+  assert.equal(rufe.filter((r) => r.url.includes('/tools/invoke')).length, 1);
+});
+
+test('Relay: fällt WhatsApp aus, genügt ein anderer Kanal; das Token landet nie im Log', async () => {
+  const logs = [];
+  const handler = erstelle_fanout_handler({
+    relayToken: 'relay', ...telegram_optionen, ...whatsapp_optionen,
+    logger: {warn: (zeile) => logs.push(zeile)}, fetchImpl: alle_kanaele([], ['whatsapp']),
+  });
+  const res = antwort_attrappe();
+  await handler(relay_anfrage({ticket: 'CHG-1', titel: 'x'}), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), {ok: true, ticket: 'CHG-1', telegram: {message_id: 9}});
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /\(whatsapp\)/);
+  assert.ok(!logs.join('\n').includes(GATEWAY_TOKEN));
+});
+
+test('Relay: nur WhatsApp und es fällt aus: 502', async () => {
+  const handler = erstelle_fanout_handler({
+    relayToken: 'relay', ...whatsapp_optionen, logger: {warn() {}}, fetchImpl: alle_kanaele([], ['whatsapp']),
+  });
+  const res = antwort_attrappe();
+  await handler(relay_anfrage({ticket: 'CHG-1', titel: 'x'}), res);
+  assert.equal(res.statusCode, 502);
+});
+
+test('Gateway-Token allein oder Nummer allein schaltet WhatsApp nicht ein', async () => {
+  let fetches = 0;
+  const fetchImpl = async () => { fetches += 1; return gateway_ok(); };
+  for (const optionen of [{gatewayToken: GATEWAY_TOKEN}, {whatsappNummer: NUMMER}]) {
+    const handler = erstelle_fanout_handler({relayToken: 'relay', ...optionen, fetchImpl});
+    const res = antwort_attrappe();
+    await handler(relay_anfrage({ticket: 'CHG-1', titel: 'x'}), res);
+    assert.equal(res.statusCode, 502);
+  }
+  assert.equal(fetches, 0);
+});
+
+test('Beschluss geht auch an WhatsApp', async () => {
+  const rufe = [];
+  const handler = erstelle_fanout_handler({relayToken: 'relay', ...whatsapp_optionen, fetchImpl: alle_kanaele(rufe)});
+  const res = antwort_attrappe();
+  await handler(relay_anfrage({event: 'aufgeloest', ticket: 'CHG-1', entscheidung: 'erteilt', ts: ''}), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), {ok: true, ticket: 'CHG-1', entscheidung: 'erteilt', whatsapp: {gesendet: true}});
+  assert.match(JSON.parse(rufe[0].init.body).args.message, /Freigabe erteilt: CHG-1/);
 });

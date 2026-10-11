@@ -62,6 +62,7 @@ the way the start last wrote them (see "First-time setup as a conversation").
 | `FYOS_VORGAENGE_URL` | optional: ticket service for `fyos-freigabe-chat` |
 | `FYOS_MATRIX_HOMESERVER`, `FYOS_MATRIX_BENUTZER`, `OPENCLAW_MATRIX_TOKEN`, `FYOS_APPROVER_MATRIX_ID` | optional: Matrix channel (`kanaele.matrix: true`; build the image with `--build-arg FYOS_KANAELE=matrix`) |
 | `OPENCLAW_TELEGRAM_TOKEN`, `FYOS_APPROVER_TELEGRAM_ID` | optional: Telegram channel (`kanaele.telegram: true`; bot token and numeric owner ID, see section "Telegram"; already part of the base image, no build argument) |
+| `FYOS_APPROVER_WHATSAPP_NUMBER` | optional: WhatsApp channel (`kanaele.whatsapp: true`; the owner's number as `+491701234567`, see section "WhatsApp"; build the image with `--build-arg FYOS_KANAELE=whatsapp`, the owner does the QR linking) |
 
 Render only, without Docker:
 
@@ -126,6 +127,45 @@ request from the ticket service additionally goes to Telegram as a plain text me
 (`genehmigt CHG-42`, `abgelehnt CHG-42`, `kommentar CHG-42: …`) decides as in Matrix without a model call; it
 suffices if one channel delivers. The reaction buttons are a Matrix peculiarity and are missing in Telegram.
 
+## WhatsApp
+
+WhatsApp is the third channel. OpenClaw links itself as a "linked device" (WhatsApp Web) by QR code; there is
+neither a token nor a bot account. The package `@openclaw/whatsapp` is not part of the base image and, like
+Matrix, is installed at build time pinned to the base version: `--build-arg FYOS_KANAELE=whatsapp` (or
+`matrix,whatsapp`). Default: off. With `kanaele.whatsapp: true` the renderer writes a channel that accepts only
+direct messages from the owner's number: `dmPolicy: allowlist` with exactly that number (no pairing: anyone else
+who writes is dropped and triggers no pairing request), `groupPolicy: disabled`, `configWrites: false` and
+`pluginHooks.messageReceived: false` (other plugins do not see incoming content). The owner's number is never in
+`fyos.yaml`, only in the environment (`FYOS_APPROVER_WHATSAPP_NUMBER`, with `+` and country code, otherwise rendering
+aborts with a message that names the variable and never its value). Matrix, Telegram and WhatsApp can be switched
+on individually or together.
+
+Setup:
+
+1. Get a number of its own for the agent (recommended: a second SIM or eSIM with WhatsApp on it, separate from the
+   private account). Anyone who wants to run the agent on their private number additionally sets
+   `whatsapp: {eigene_nummer: true}`; messages to oneself then count as input.
+2. Build the image with `--build-arg FYOS_KANAELE=whatsapp`. The state directory `~/.openclaw` must live on a
+   volume: the link is afterwards stored under `~/.openclaw/credentials/whatsapp/default/`.
+3. Set the owner's number as `FYOS_APPROVER_WHATSAPP_NUMBER` (notation like `+491701234567`), enter
+   `kanaele: {whatsapp: true}` in `fyos.yaml` and (re)start the gateway.
+4. **The owner does the linking** (this needs the phone): call `openclaw channels login --channel whatsapp` in the
+   container and scan the QR code in WhatsApp under "Linked devices". The code expires quickly; the terminal must
+   show the QR code legibly. Check with `openclaw channels status --probe`.
+5. Write to the agent from the owner's number. A message from the agent to the owner only goes out once the link is
+   in place (the gateway is running and the account is linked); otherwise sending fails immediately.
+
+Approvals also run through WhatsApp. Native approvals of the agent arrive as a message that the owner answers with
+👍 or 👎 (`approvals.plugin.targets`). With `fyos-freigabe-chat`, a request from the ticket service additionally goes
+to WhatsApp as a plain text message (through the gateway's own interface in the same container, signed in with
+`OPENCLAW_GATEWAY_TOKEN`; without a linked session only this channel fails), and the owner's reply
+(`genehmigt CHG-42`, `abgelehnt CHG-42`, `kommentar CHG-42: …`) decides as in Matrix without a model call; it
+suffices if one channel delivers.
+
+Other channels OpenClaw supports itself (Signal via signal-cli, Slack, Discord, iMessage, Microsoft Teams and more)
+are not prepared here; they could be added the same way (extra package at build time, `kanaele.<name>`, binding,
+owner allowlist).
+
 ## First-time setup as a conversation
 
 In the first conversation of a fresh installation, the agent gets to know the owner instead of everything having to be
@@ -176,7 +216,7 @@ python3 tools/sauber.py .                        # no personal content
 |---|---|---|
 | `fyos-prioritaet` | tool `fyos_conversation_status`, 15-minute run-on period, persistent state | on |
 | `fyos-meldebudget` | at most N proactive messages per day, quiet hours, in the hook `message_sending` | on |
-| `fyos-freigabe-chat` | the owner's chat/Matrix/Telegram reply decides an open approval, without a model call | on if `faehigkeiten.vorgaenge: true` and `FYOS_VORGAENGE_URL` is set |
+| `fyos-freigabe-chat` | the owner's chat/Matrix/Telegram/WhatsApp reply decides an open approval, without a model call | on if `faehigkeiten.vorgaenge: true` and `FYOS_VORGAENGE_URL` is set |
 | `fyos-kontext-edit` | experiment: the agent cleans up its own tool results | off |
 | `fyos-speed-router` | optional: short small-talk turns go to a small model | off (needs `tempo_router.ziel_modell`) |
 | `fyos-bruecke` | coupling to the hub: tool and model calls, runs, sessions, cron, skills sent to the hub as events without contents; route `/plugins/fyos-bruecke/v1/rpc` for workboard, skills, cron and usage (fixed list of methods) | on (`kopplung.aktiv`) |
