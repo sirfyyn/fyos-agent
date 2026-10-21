@@ -9,6 +9,11 @@ trägt dieselbe Versionsnummer wie das Schwester-Repo `fyos-os` und wird mit dem
 von `fyos-os` zieht das Bild `openclaw` mit diesem Tag. Das Plugin `fyos-bruecke` hat zusätzlich eine eigene Nummer
 (0.2.0 in dieser Version).
 
+## [0.1.2] – 2026-10-22
+
+Keine inhaltlichen Änderungen am Agenten. Die Nummer folgt der FYOS-Version, weil der Installer das Bild `openclaw`
+mit dem Tag seiner eigenen Version zieht.
+
 ## [0.1.1] – 2026-10-11
 
 Vorbereitet: Der Tag `v0.1.1` und die Veröffentlichung folgen nach dem Ablauf in `RELEASE.md` im Repo `fyos-os`.
