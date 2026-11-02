@@ -1,3 +1,5 @@
+[![FLE Link: run an agent next to your model](https://flelink.run/media/banner-agent.jpg)](https://flelink.run)
+
 Deutsch: [README.de.md](README.de.md)
 
 # fyos-agent Runner
