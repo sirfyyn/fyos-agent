@@ -1,23 +1,22 @@
-English: [README.en.md](README.en.md)
+Deutsch: [README.de.md](README.de.md)
 
 # fyos-agent
 
-Der Agent der Distribution **FYOS — For Your Own Sake**: ein dauerhafter Runner auf
-[pi-durable](https://www.npmjs.com/package/@earendil-works/pi-durable). Gespräche, Werkzeugaufrufe und Freigaben stehen
-in einer SQLite-Datei und überleben jeden Neustart. Der Runner spricht ein OpenAI-kompatibles Modell an, holt Werkzeuge
-aus dem FYOS-Hub (MCP) und fragt vor jedem schreibenden Schritt nach einer Freigabe.
+The agent of the distribution **FYOS — For Your Own Sake**: a durable runner on
+[pi-durable](https://www.npmjs.com/package/@earendil-works/pi-durable). Conversations, tool calls and approvals live in
+one SQLite file and survive every restart. The runner talks to an OpenAI-compatible model, takes its tools from the
+FYOS hub (MCP) and asks for approval before every writing step.
 
-| Ordner | Inhalt |
+| Folder | Contents |
 |---|---|
-| [`runner/`](runner/README.md) | der Runner: Quelle, Weboberfläche, Tests, Vorlage, Dockerfile (Bild `fyos-agent/runner`) |
-| `runner/lokal/` | Startprogramm des lokalen Modus für die FYOS-Hülle |
-| `tools/` | `sauber.py` (Sauberkeitsprüfung, siehe `.sauber/`) |
+| [`runner/`](runner/README.md) | the runner: source, web UI, tests, template, Dockerfile (image `fyos-agent/runner`) |
+| `runner/lokal/` | start program of the local mode for the FYOS shell |
+| `tools/` | `sauber.py` (cleanliness check, see `.sauber/`) |
 
-Anleitung, Schnellstart und Umgebung: [`runner/README.md`](runner/README.md). Eingerichtet wird der Agent meist über den
-Installer aus dem Schwester-Repo `fyos-os` (`fyos-install`), der das Bild mit dem Tag seiner Version zieht. Beide Repos
-tragen dieselbe Versionsnummer.
+Guide, quick start and environment: [`runner/README.md`](runner/README.md). Most people set the agent up with the
+installer from the sister repo `fyos-os` (`fyos-install`), which pulls the image with the tag of its own version. Both
+repos carry the same version number.
 
-Bis 0.2.0 enthielt dieses Repo zusätzlich einen OpenClaw-Mod; seit 0.2.1 ist der Runner der einzige Agent
-([CHANGELOG](CHANGELOG.md)).
+Up to 0.2.0 this repo also contained an OpenClaw mod; since 0.2.1 the runner is the only agent ([CHANGELOG](CHANGELOG.md)).
 
-Lizenz: Apache-2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)).
+License: Apache-2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)).

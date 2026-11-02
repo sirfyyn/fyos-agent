@@ -29,6 +29,7 @@ import { freigabenEntscheiden, freigabenQuelle } from './freigabe-itsm.js';
 import { FreigabeReaktionen, erlaubenErlaubt } from './freigabe-reaktionen.js';
 import { schwaerzen } from './schwaerzen.js';
 import { Kette, istObjekt, kurz, logger, wachenAendern, wachenLesen } from './wachen-zustand.js';
+import { tx } from './i18n.js';
 
 export const KANAELE = ['matrix', 'ntfy'];
 const MIN = 60_000;
@@ -131,19 +132,24 @@ export function erinnerungsAbstand(k, { nachS, faktor, maxS }) {
 
 function dauer(ms) {
   const m = Math.round(ms / MIN);
-  if (m < 1) return 'gerade eben';
+  if (m < 1) return tx('gerade eben', 'just now');
   if (m < 90) return `${m} min`;
   const h = Math.round(m / 60);
   if (h < 48) return `${h} h`;
-  return `${Math.round(h / 24)} Tage`;
+  return `${Math.round(h / 24)} ${tx('Tage', 'days')}`;
 }
 
 const RISIKO = { high: 'hoch', medium: 'mittel', low: 'niedrig' };
-const risikoWort = (f) => RISIKO[f.risiko] ?? 'mittel';
+const RISIKO_EN = { high: 'high', medium: 'medium', low: 'low' };
+const risikoWort = (f) => tx(RISIKO[f.risiko] ?? 'mittel', RISIKO_EN[f.risiko] ?? 'medium');
 const linkFuer = (kfg, f) =>
   f && kfg.linkEinzeln ? kfg.linkEinzeln.replaceAll('{id}', encodeURIComponent(String(f.id))) : kfg.link;
 
-const HINWEIS = 'Entscheiden nur in der FYOS-App (Persona-Tab) oder im Runner-Web, jeweils mit Anmeldung. Eine Antwort auf diese Nachricht entscheidet nichts.';
+const HINWEIS = () =>
+  tx(
+    'Entscheiden nur in der FYOS-App (Persona-Tab) oder im Runner-Web, jeweils mit Anmeldung. Eine Antwort auf diese Nachricht entscheidet nichts.',
+    'Decide only in the FYOS app or in the runner web client, each with sign-in. A reply to this message decides nothing.',
+  );
 
 /**
  * Baut die Nachricht für einen Kanal. `art`: 'neu' | 'erinnerung'; `liste`: Freigaben (eine = Einzelmeldung, mehrere = Bündel).
@@ -157,31 +163,39 @@ export function nachrichtBauen({ art, liste, kanal, kfg, jetzt, nummer = 1 }) {
   let titel;
   if (liste.length === 1) {
     const f = liste[0];
-    titel = art === 'neu' ? 'Freigabe nötig' : `Erinnerung ${nummer}: Freigabe weiter offen`;
-    if (f.risiko === 'high') titel += ' (hohes Risiko)';
+    titel = art === 'neu'
+      ? tx('Freigabe nötig', 'Approval needed')
+      : tx(`Erinnerung ${nummer}: Freigabe weiter offen`, `Reminder ${nummer}: approval still open`);
+    if (f.risiko === 'high') titel += tx(' (hohes Risiko)', ' (high risk)');
     zeilen.push(titel);
     // Entscheidung 586: der Kurzkontext (3–5 Sätze) steht zuerst, damit man in Sekunden entscheiden kann; dann Aktion und Risiko.
     const kontext = kontextKuerzen(kontextAnzeigen(f), kanal.kontextMax ?? 600);
     if (kontext) zeilen.push(kontext);
-    zeilen.push(`Aktion: ${schwaerzen(f.aktion, 160)}`);
-    zeilen.push(`Risiko: ${risikoWort(f)}${f.zerstoererisch ? ' · zerstörend' : ''}`);
-    if (kanal.befehl && f.befehl) zeilen.push(`Befehl: ${schwaerzen(f.befehl, 300)}`);
-    zeilen.push(`Offen seit ${alter(f)}`);
+    zeilen.push(`${tx('Aktion', 'Action')}: ${schwaerzen(f.aktion, 160)}`);
+    zeilen.push(`${tx('Risiko', 'Risk')}: ${risikoWort(f)}${f.zerstoererisch ? tx(' · zerstörend', ' · destructive') : ''}`);
+    if (kanal.befehl && f.befehl) zeilen.push(`${tx('Befehl', 'Command')}: ${schwaerzen(f.befehl, 300)}`);
+    zeilen.push(`${tx('Offen seit', 'Open for')} ${alter(f)}`);
   } else {
-    titel = art === 'neu' ? `${liste.length} Freigaben warten auf dich` : `Erinnerung ${nummer}: ${liste.length} Freigaben weiter offen`;
+    titel = art === 'neu'
+      ? tx(`${liste.length} Freigaben warten auf dich`, `${liste.length} approvals are waiting for you`)
+      : tx(`Erinnerung ${nummer}: ${liste.length} Freigaben weiter offen`, `Reminder ${nummer}: ${liste.length} approvals still open`);
     zeilen.push(titel);
-    for (const f of liste.slice(0, 8)) zeilen.push(`- ${risikoWort(f)} · ${schwaerzen(f.aktion, 100)} (seit ${alter(f)})`);
-    if (liste.length > 8) zeilen.push(`… und ${liste.length - 8} weitere`);
+    for (const f of liste.slice(0, 8)) zeilen.push(`- ${risikoWort(f)} · ${schwaerzen(f.aktion, 100)} (${tx('seit', 'for')} ${alter(f)})`);
+    if (liste.length > 8) zeilen.push(tx(`… und ${liste.length - 8} weitere`, `… and ${liste.length - 8} more`));
   }
   if (liste.length === 1 && kanal.chips === true) {
     zeilen.push(
       erlaubenErlaubt(liste[0])
-        ? 'Entscheide mit einer Reaktion: ✅ erlauben, ❌ ablehnen, ⏳ später. Eine Textantwort entscheidet nichts.'
-        : 'Erlauben nur in der App (Halten); hier gehen ❌ ablehnen und ⏳ später. Eine Textantwort entscheidet nichts.',
+        ? tx('Entscheide mit einer Reaktion: ✅ erlauben, ❌ ablehnen, ⏳ später. Eine Textantwort entscheidet nichts.',
+          'Decide with a reaction: ✅ allow, ❌ deny, ⏳ later. A text reply decides nothing.')
+        : tx('Erlauben nur in der App (Halten); hier gehen ❌ ablehnen und ⏳ später. Eine Textantwort entscheidet nichts.',
+          'Allow only in the app (hold); here ❌ deny and ⏳ later work. A text reply decides nothing.'),
     );
-  } else zeilen.push(HINWEIS);
-  if (link) zeilen.push(`Öffnen: ${link}`);
-  const bezug = liste.length === 1 ? `Freigabe ${kurz(String(liste[0].id).replace(/[^A-Za-z0-9._:-]/g, ''), 40)}` : `${liste.length} Freigaben`;
+  } else zeilen.push(HINWEIS());
+  if (link) zeilen.push(`${tx('Öffnen', 'Open')}: ${link}`);
+  const bezug = liste.length === 1
+    ? `${tx('Freigabe', 'Approval')} ${kurz(String(liste[0].id).replace(/[^A-Za-z0-9._:-]/g, ''), 40)}`
+    : tx(`${liste.length} Freigaben`, `${liste.length} approvals`);
   return { titel, text: zeilen.join('\n'), dringend: hoch, link: link || '', bezug, art };
 }
 

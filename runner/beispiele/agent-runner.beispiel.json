@@ -6,6 +6,7 @@
     "an": false
   },
   "pi_durable": {
+    "sprache": "en",
     "host": "127.0.0.1",
     "port": 18438,
     "device": {
@@ -22,18 +23,18 @@
       "provider": "lokal",
       "baseUrl": "http://127.0.0.1:8081/v1",
       "apiKey": "lokal",
-      "default": "mein-modell",
-      "max": "mein-modell"
+      "default": "my-model",
+      "max": "my-model"
     },
     "nodes": [
       {
         "id": "server2",
-        "titel": "Zweiter Server",
+        "titel": "Second server",
         "art": "linux",
         "host": "192.0.2.20",
         "user": "agent",
         "port": 22,
-        "notiz": "Beispiel"
+        "notiz": "Example"
       }
     ],
     "arbeitsschleife": {

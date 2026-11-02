@@ -13,12 +13,15 @@
  * Endet bei SIGTERM/SIGINT sauber (Server zu, Harness zu) und nach spätestens 5 s hart.
  */
 import { bindungPruefen, konfigurationLaden, oeffentlicheSicht } from './config.js';
+import { spracheSetzen } from './i18n.js';
 import { Runner } from './runner.js';
 import { erstelleServer } from './server.js';
 
 async function main() {
   const cfg = konfigurationLaden();
   const pd = cfg.pi_durable;
+  // Local mode defaults to English (config.js); FYOS_RUNNER_SPRACHE=de or pi_durable.sprache switches it.
+  spracheSetzen(pd.sprache);
   if (pd.lokal !== true) {
     console.error('[fyos-runner-lokal] Start abgelehnt: FYOS_RUNNER_LOKAL=1 fehlt (für den vollen Runner gilt src/index.js)');
     process.exit(2);

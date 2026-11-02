@@ -9,6 +9,7 @@
  */
 import { KONTEXT } from './lauf/index.js';
 import { Freigaben } from './documents.js';
+import { tx } from './i18n.js';
 
 const FRIST_MS = 60 * 60 * 1000;
 const norm = (s) => String(s ?? '').trim().replace(/\s+/g, ' ');
@@ -32,8 +33,10 @@ export async function befehlFreigegeben(api, befehl, context = KONTEXT) {
 /** Der Satz, den der Agent bei einer Sperre bekommt: genau der Weg, wie es doch geht. */
 export function freigabeHinweis(befehl) {
   const kurz = String(befehl ?? '').length > 160 ? `${String(befehl).slice(0, 160)}…` : String(befehl ?? '');
-  return (
+  return tx(
     `Zerstörend, darum mit Freigabe: rufe freigabe_bitten(aktion, kontext: <3–5 Sätze: was und wo, warum jetzt, Wirkung, Risiko, Rückweg>, werkzeug: "bash", befehl: <genau dieser Befehl>) auf ` +
-    `(Befehl: ${kurz}). Sobald ein Mensch zugestimmt hat, führe denselben Befehl noch einmal aus; er läuft dann durch.`
+      `(Befehl: ${kurz}). Sobald ein Mensch zugestimmt hat, führe denselben Befehl noch einmal aus; er läuft dann durch.`,
+    `Destructive, so it needs an approval: call freigabe_bitten(aktion, kontext: <3–5 sentences: what and where, why now, effect, risk, way back>, werkzeug: "bash", befehl: <exactly this command>) ` +
+      `(command: ${kurz}). As soon as a human has approved, run the same command again; it will then go through.`,
   );
 }

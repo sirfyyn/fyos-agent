@@ -14,6 +14,7 @@ const STATIC = [
   '/',
   '/index.html',
   '/app.js',
+  '/i18n.js',
   '/style.css',
   '/wirken.css',
   '/manifest.webmanifest',

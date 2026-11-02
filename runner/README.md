@@ -1,22 +1,22 @@
-English: [README.en.md](README.en.md)
+Deutsch: [README.de.md](README.de.md)
 
 # fyos-agent Runner
 
-Der Agent von FYOS ab 0.2.0: ein dauerhafter Runner auf
-[pi-durable](https://www.npmjs.com/package/@earendil-works/pi-durable). Gespräche, Werkzeugaufrufe und Freigaben
-liegen in einer SQLite-Datei und überleben jeden Neustart. Der Runner spricht ein OpenAI-kompatibles Modell an,
-holt Werkzeuge aus dem FYOS-Hub (MCP) und fragt vor jedem schreibenden Schritt nach einer Freigabe.
+The FYOS agent from 0.2.0 on: a durable runner on
+[pi-durable](https://www.npmjs.com/package/@earendil-works/pi-durable). Conversations, tool calls and approvals live
+in one SQLite file and survive every restart. The runner talks to an OpenAI-compatible model, takes its tools from
+the FYOS hub (MCP) and asks for approval before every writing step.
 
-Der Ordner wird aus dem FYOS-Monorepo erzeugt (`scripts/ops/release/agent_abzug.py`). Änderungen bitte dort, nicht hier.
+This folder is generated from the FYOS monorepo (`scripts/ops/release/agent_abzug.py`). Please change things there.
 
-## Zwei Betriebsarten
+## Two modes
 
-| Art | Start | Was läuft |
+| Mode | Start | What runs |
 |---|---|---|
-| **Lokal** (Desktop) | `lokal/runner-lokal` oder `FYOS_RUNNER_LOKAL=1 node src/lokal.js` | Runner, Gespräche, Werkzeuge, Freigaben, Weboberfläche. Kein Hub, keine Rechner per ssh, kein Browser. |
-| **Voll** (Server) | `node src/index.js --config agent-runner.json` | Dazu Hub-Werkzeuge, Takt, Arbeitsschleife, Gedächtnis, Browser, Freigabe-Meldungen. |
+| **Local** (desktop) | `lokal/runner-lokal` or `FYOS_RUNNER_LOKAL=1 node src/lokal.js` | Runner, conversations, tools, approvals, web UI. No hub, no machines over ssh, no browser. |
+| **Full** (server) | `node src/index.js --config agent-runner.json` | Plus hub tools, schedule, work loop, memory, browser, approval notices. |
 
-## Schnellstart (lokal)
+## Quick start (local)
 
 ```sh
 npm ci --omit=dev
@@ -24,38 +24,47 @@ mkdir -p ~/.fyos/runner && openssl rand -hex 32 > ~/.fyos/runner/token
 FYOS_RUNNER_DATEN="$HOME/.fyos/runner" \
 FYOS_RUNNER_PORT=18438 \
 FYOS_LOKAL_MODELL_URL=http://127.0.0.1:8081/v1 \
-FYOS_LOKAL_MODELL_ID=mein-modell \
+FYOS_LOKAL_MODELL_ID=my-model \
 FYOS_RUNNER_TOKEN="$(cat ~/.fyos/runner/token)" \
 node lokal/starten.mjs
 ```
 
-Die Oberfläche steht danach unter `http://127.0.0.1:18438/` (Anmeldung mit dem Token). Der Terminal-Client:
-`node scripts/fyos-agent.mjs`. Ein Bündel mit eigenem Node für die FYOS-Hülle baut `node scripts/runner-lokal-buendel.mjs`.
+The UI is then at `http://127.0.0.1:18438/` (sign in with the token). Terminal client: `node scripts/fyos-agent.mjs`.
+`node scripts/runner-lokal-buendel.mjs` builds a bundle with its own Node for the FYOS shell.
 
-## Volle Konfiguration
+## Full configuration
 
-Vorlage: `beispiele/agent-runner.beispiel.json`. Pfad per `--config` oder `FYOS_RUNNER_CONFIG`. Ohne Token startet der
-Runner nicht, weil er Befehle ausführt. Rechner, auf die er per ssh darf, stehen nur in `pi_durable.nodes`; im Code
-sind keine hinterlegt.
+Template: `beispiele/agent-runner.beispiel.json`. Path via `--config` or `FYOS_RUNNER_CONFIG`. Without a token the
+runner refuses to start, because it runs commands. Machines it may reach over ssh are listed only in
+`pi_durable.nodes`; none are built in.
 
-Der eingebaute Tagesrhythmus (`takt`: Morgen, Abend, Nacht, Nachtwerkstatt) ist für einen bestimmten Alltag gebaut; die
-Vorlage schaltet ihn mit `"takt": {"an": false}` aus. Eigene Einträge stehen unter `takt.eintraege`.
+The built-in daily rhythm (`takt`: morning, evening, night, night workshop) is built for one particular routine; the
+template turns it off with `"takt": {"an": false}`. Own entries go under `takt.eintraege`.
 
-| Umgebung | Bedeutung |
+## Language
+
+`pi_durable.sprache` (`en` | `de`) sets the language of everything a person reads (web UI, API errors, approval notices
+over Matrix/ntfy, terminal client) and of the runner's own prompt sections and tool descriptions. Tool names stay the
+same in both languages (they are the contract with the hub). The template, the container image
+(`FYOS_RUNNER_SPRACHE=en`) and the local mode use English; without a setting the full mode stays German. Start logs are
+German.
+
+| Environment | Meaning |
 |---|---|
-| `FYOS_RUNNER_CONFIG` | Pfad zur Konfiguration |
-| `FYOS_RUNNER_TOKEN`, `FYOS_RUNNER_PORT`, `FYOS_RUNNER_HOST` | Anmeldung und Adresse der Oberfläche |
-| `FYOS_RUNNER_CONTAINER` | `1` im Bild: Bindung an alle Adressen erlaubt, nur mit Token |
-| `FYOS_RUNNER_LOKAL` | `1` schaltet den lokalen Modus ein |
-| `FYOS_LOKAL_MODELL_URL`, `FYOS_LOKAL_MODELL_ID`, `FYOS_LOKAL_MODELL_KEY(_DATEI)` | Modell im lokalen Modus |
-| `FYOS_MODELL_BASIS_URL`, `FYOS_MODELL_NAME`, `FYOS_MODELL_SCHLUESSEL` | Modell im vollen Modus (wie im Installer) |
-| `FYOS_HUB_AGENT_TOKEN` | Token für den Hub (sonst `hub_token_datei`) |
-| `FYOS_PROVIDER_KETTE` | Reihenfolge der Modelle, wenn eines ausfällt |
+| `FYOS_RUNNER_CONFIG` | Path to the configuration |
+| `FYOS_RUNNER_TOKEN`, `FYOS_RUNNER_PORT`, `FYOS_RUNNER_HOST` | Sign-in and address of the UI |
+| `FYOS_RUNNER_CONTAINER` | `1` in the image: binding to all addresses allowed, only with a token |
+| `FYOS_RUNNER_LOKAL` | `1` turns on local mode |
+| `FYOS_RUNNER_SPRACHE` | `en` or `de`: language of texts and prompts (overrides `pi_durable.sprache`) |
+| `FYOS_LOKAL_MODELL_URL`, `FYOS_LOKAL_MODELL_ID`, `FYOS_LOKAL_MODELL_KEY(_DATEI)` | Model in local mode |
+| `FYOS_MODELL_BASIS_URL`, `FYOS_MODELL_NAME`, `FYOS_MODELL_SCHLUESSEL` | Model in full mode (same as the installer) |
+| `FYOS_HUB_AGENT_TOKEN` | Token for the hub (otherwise `hub_token_datei`) |
+| `FYOS_PROVIDER_KETTE` | Order of models when one fails |
 
-## Prüfen
+## Check
 
 ```sh
 npm ci && npm test
 ```
 
-Lizenz: Apache-2.0.
+License: Apache-2.0.

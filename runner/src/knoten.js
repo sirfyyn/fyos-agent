@@ -13,6 +13,7 @@
 import { execFile } from 'node:child_process';
 import { userInfo } from 'node:os';
 import { Schema as Type, werkzeug as defineTool } from './lauf/index.js';
+import { tx } from './i18n.js';
 
 const textErgebnis = (text) => ({ output: [{ type: 'text', text: String(text ?? '') }] });
 
@@ -149,8 +150,8 @@ export class Knoten {
 
   async befehl(id, befehl, { timeoutMs = 60_000, cwd } = {}) {
     const knoten = this.knoten.find((k) => k.id === id);
-    if (!knoten) throw new Error(`Unbekannter Knoten „${id}“. Bekannt: ${this.knoten.map((k) => k.id).join(', ')}`);
-    if (!String(befehl ?? '').trim()) throw new Error('Befehl fehlt');
+    if (!knoten) throw new Error(tx(`Unbekannter Knoten „${id}“. Bekannt: `, `Unknown node “${id}”. Known: `) + this.knoten.map((k) => k.id).join(', '));
+    if (!String(befehl ?? '').trim()) throw new Error(tx('Befehl fehlt', 'Command missing'));
     const arbeitsordner = cwd ?? knoten.cwd ?? this.standardCwd;
     if (knoten.local) {
       return ausfuehren(this.shell, ['-lc', befehl], {
@@ -193,23 +194,26 @@ export class Knoten {
 export function knotenWerkzeuge({ cfg, knoten = new Knoten(cfg) }) {
   const liste = defineTool({
     name: 'knoten_liste',
-    description:
+    description: tx(
       'Listet alle FYOS-Knoten (dieses Gerät, Hauptserver, TrueNAS, Jetson, Pi4, VPS) mit ihrem Weg. ' +
-      'Mit pruefen=true wird jeder Knoten per ssh kurz angerufen; das zeigt, ob Befehle wirklich ankommen.',
+        'Mit pruefen=true wird jeder Knoten per ssh kurz angerufen; das zeigt, ob Befehle wirklich ankommen.',
+      'Lists all configured nodes (this device and the machines in pi_durable.nodes) with their route. ' +
+        'With pruefen=true every node is called briefly over ssh; that shows whether commands really arrive.',
+    ),
     parameters: Type.Object({
-      pruefen: Type.Optional(Type.Boolean({ description: 'Jedem Knoten einen kurzen echten Befehl schicken (Vorgabe: false)' })),
+      pruefen: Type.Optional(Type.Boolean({ description: tx('Jedem Knoten einen kurzen echten Befehl schicken (Vorgabe: false)', 'Send every node a short real command (default: false)') })),
     }),
     replay: 'safe',
     execute: async ({ pruefen = false }, _api, context) => {
       const eintraege = knoten.liste().map((k) => ({
         ...k,
-        status: pruefen ? undefined : 'nicht geprüft',
+        status: pruefen ? undefined : tx('nicht geprüft', 'not checked'),
       }));
       if (pruefen) {
         const ergebnisse = new Map((await knoten.allePruefen()).map((e) => [e.id, e]));
         for (const e of eintraege) {
           const r = ergebnisse.get(e.id);
-          e.status = r?.ok ? 'erreichbar' : 'nicht erreichbar';
+          e.status = r?.ok ? tx('erreichbar', 'reachable') : tx('nicht erreichbar', 'not reachable');
           e.ms = r?.ms ?? null;
           e.antwort = r?.ausgabe ?? null;
         }
@@ -220,15 +224,19 @@ export function knotenWerkzeuge({ cfg, knoten = new Knoten(cfg) }) {
 
   const befehl = defineTool({
     name: 'knoten_befehl',
-    description:
+    description: tx(
       'Führt einen echten Befehl auf einem FYOS-Knoten aus — lokal oder über ssh auf Hauptserver/TrueNAS/Jetson/Pi4/VPS. ' +
-      'Für alle Befehle, die die Shell kann: systemctl, docker, kubectl, git, Dateien, Dienste. ' +
-      'Zerstörerische Befehle vorher im Auftrag begründen und den Rückweg nennen.',
+        'Für alle Befehle, die die Shell kann: systemctl, docker, kubectl, git, Dateien, Dienste. ' +
+        'Zerstörerische Befehle vorher im Auftrag begründen und den Rückweg nennen.',
+      'Runs a real command on a node — locally or over ssh on a configured machine. ' +
+        'For every command the shell can do: systemctl, docker, kubectl, git, files, services. ' +
+        'Justify destructive commands in the task first and name the way back.',
+    ),
     parameters: Type.Object({
-      knoten: Type.String({ description: 'Knoten-ID aus knoten_liste, z. B. hauptserver, truenas, jetson, pi4, vps, macbook' }),
-      befehl: Type.String({ description: 'Vollständiger Shell-Befehl; läuft lokal mit bash -lc oder remote über ssh' }),
-      timeout_s: Type.Optional(Type.Number({ minimum: 1, maximum: 1800, description: 'Zeitlimit in Sekunden (Vorgabe: 60)' })),
-      cwd: Type.Optional(Type.String({ description: 'Arbeitsordner (nur lokal; Vorgabe: Arbeitsbereich des Gesprächs)' })),
+      knoten: Type.String({ description: tx('Knoten-ID aus knoten_liste, z. B. hauptserver, truenas, jetson, pi4, vps, macbook', 'Node id from knoten_liste') }),
+      befehl: Type.String({ description: tx('Vollständiger Shell-Befehl; läuft lokal mit bash -lc oder remote über ssh', 'Complete shell command; runs locally with bash -lc or remotely over ssh') }),
+      timeout_s: Type.Optional(Type.Number({ minimum: 1, maximum: 1800, description: tx('Zeitlimit in Sekunden (Vorgabe: 60)', 'Time limit in seconds (default: 60)') })),
+      cwd: Type.Optional(Type.String({ description: tx('Arbeitsordner (nur lokal; Vorgabe: Arbeitsbereich des Gesprächs)', 'Working folder (local only; default: workspace of the conversation)') })),
     }),
     replay: 'unsafe',
     execute: async ({ knoten: id, befehl: cmd, timeout_s = 60, cwd }, _api, context) => {
@@ -236,7 +244,7 @@ export function knotenWerkzeuge({ cfg, knoten = new Knoten(cfg) }) {
         timeoutMs: Math.max(1, Math.min(1800, Number(timeout_s) || 60)) * 1000,
         cwd,
       });
-      const kopf = `Knoten: ${id} · ${r.ok ? 'ok' : `Fehler${r.code ? ` (${r.code})` : ''}`}${r.timedOut ? ' · Zeitlimit' : ''}`;
+      const kopf = `${tx('Knoten', 'Node')}: ${id} · ${r.ok ? 'ok' : `${tx('Fehler', 'Error')}${r.code ? ` (${r.code})` : ''}`}${r.timedOut ? tx(' · Zeitlimit', ' · time limit') : ''}`;
       const inhalt = [kopf, r.stdout && `--- stdout ---\n${r.stdout}`, r.stderr && `--- stderr ---\n${r.stderr}`]
         .filter(Boolean)
         .join('\n');

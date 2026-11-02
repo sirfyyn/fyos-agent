@@ -126,8 +126,13 @@ export function uebersetzen(env, argv = [], { plattform = process.platform, rech
   const kind = plattform === 'darwin' ? 'mac' : 'linux';
   const gerId = (`lokal-${rechnername}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32).replace(/-+$/, '')) || 'lokal';
 
+  // Language of the texts people and the model read (pi_durable.sprache): the local mode is public, so English unless set.
+  const nutzerKonfig = jsonLesen(join(daten, 'konfig.json'), 'konfig.json') ?? {};
+  const sprache = /^de/i.test(text(env.FYOS_RUNNER_SPRACHE, text(nutzerKonfig.pi_durable?.sprache, 'en'))) ? 'de' : 'en';
+  const geraetName = sprache === 'de' ? `Dieser Computer (${rechnername})` : `This computer (${rechnername})`;
+
   const eigene = {
-    arbeitsbereiche: { standard: { pfad: arbeit, titel: 'Arbeitsbereich' } },
+    arbeitsbereiche: { standard: { pfad: arbeit, titel: sprache === 'de' ? 'Arbeitsbereich' : 'Workspace' } },
     modelle: { [modell.modelId]: { tier: 'normal', ctx_max: modell.contextWindow }, [modell.maxModelId]: { tier: 'normal', ctx_max: modell.contextWindow } },
     bahnen: {
       max: { provider: 'hausmodell', modelId: modell.maxModelId },
@@ -137,16 +142,17 @@ export function uebersetzen(env, argv = [], { plattform = process.platform, rech
       lokal: true,
       host,
       port,
-      device: { id: gerId, name: `Dieser Computer (${rechnername})`, kind },
+      sprache,
+      device: { id: gerId, name: geraetName, kind },
       storage: join(daten, 'fyos.sqlite'),
       // PATH des Nutzers, damit bash die Werkzeuge findet, die er selbst hat; sonst die üblichen Orte.
       env: { PATH: text(env.PATH, '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'), HOME: text(env.HOME, homedir()) },
       model: { provider: 'hausmodell', baseUrl: modell.baseUrl, default: modell.modelId, max: modell.maxModelId },
       provider_kette: ['hausmodell'],
-      provider: { hausmodell: { name: 'Lokales Modell', contextWindow: modell.contextWindow, maxTokens: modell.maxTokens, sperrtSpielmodus: false } },
+      provider: { hausmodell: { name: sprache === 'de' ? 'Lokales Modell' : 'Local model', contextWindow: modell.contextWindow, maxTokens: modell.maxTokens, sperrtSpielmodus: false } },
     },
   };
-  const konfig = tief(eigene, jsonLesen(join(daten, 'konfig.json'), 'konfig.json') ?? {});
+  const konfig = tief(eigene, nutzerKonfig);
   // Was der Vertrag festlegt, lässt sich durch konfig.json nicht umstellen.
   konfig.pi_durable = { ...konfig.pi_durable, lokal: true, host, port, storage: eigene.pi_durable.storage };
 
@@ -160,7 +166,8 @@ export function uebersetzen(env, argv = [], { plattform = process.platform, rech
     FYOS_RUNNER_STORAGE: konfig.pi_durable.storage,
     FYOS_RUNNER_WORKSPACE: konfig.arbeitsbereiche?.standard?.pfad ?? arbeit,
     FYOS_DEVICE_ID: gerId,
-    FYOS_DEVICE_NAME: `Dieser Computer (${rechnername})`,
+    FYOS_DEVICE_NAME: geraetName,
+    FYOS_RUNNER_SPRACHE: sprache,
     FYOS_DEVICE_KIND: kind,
     FYOS_HAUSMODELL_KEY: modell.schluessel,
   };

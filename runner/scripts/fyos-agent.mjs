@@ -10,6 +10,9 @@
  *   /hilfe           diese Hilfe        /ende  beenden
  * Alles andere geht als Nachricht an das Fokus-Gespräch. Schreiben ändert nur den Fokus.
  * Das Token kommt aus --token, FYOS_RUNNER_TOKEN oder ~/.fyos/runner/token.
+ *
+ * Language: FYOS_RUNNER_SPRACHE (de|en) wins, otherwise the runner's setting (`sprache` in /api/konfiguration).
+ * English commands work in both languages: /live [on|off], /focus, /help, /quit.
  */
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -45,6 +48,11 @@ const AUS = '\x1b[0m';
 
 const S = { live: !process.argv.includes('--aus'), fokus: null, gespraeche: [] };
 
+// Language of this client: environment first, then the runner (main reads /api/konfiguration).
+let EN = /^en/i.test(process.env.FYOS_RUNNER_SPRACHE ?? '');
+const festeSprache = /^(de|en)/i.test(process.env.FYOS_RUNNER_SPRACHE ?? '');
+const tx = (de, en) => (EN ? en : de);
+
 async function ladeGespraeche() {
   S.gespraeche = (await api('/api/gespraeche')).gespraeche;
   if (!S.fokus) S.fokus = (S.gespraeche.find((g) => g.art === 'root') ?? S.gespraeche[0])?.id ?? null;
@@ -54,7 +62,7 @@ const titel = (id) => S.gespraeche.find((g) => g.id === id)?.titel ?? id;
 function zeigeZeile(z) {
   if (!S.live) return;
   const wo = z.gespraech === S.fokus ? '' : `[${z.titel ?? z.gespraech}] `;
-  const zeit = new Date(z.t).toLocaleTimeString('de-DE', { hour12: false });
+  const zeit = new Date(z.t).toLocaleTimeString(EN ? 'en-GB' : 'de-DE', { hour12: false });
   process.stdout.write(`\r\x1b[K${FARBE[z.typ] ?? ''}${zeit} ${wo}${z.text}${AUS}\n`);
   rl.prompt(true);
 }
@@ -81,7 +89,7 @@ async function strom() {
         }
       }
     } catch (fehler) {
-      process.stderr.write(`\r\x1b[Kstrom unterbrochen (${fehler.message}), neu in 3 s\n`);
+      process.stderr.write(`\r\x1b[K${tx('strom unterbrochen', 'stream interrupted')} (${fehler.message}), ${tx('neu in 3 s', 'retrying in 3 s')}\n`);
     }
     await new Promise((f) => setTimeout(f, 3000));
   }
@@ -94,9 +102,12 @@ async function befehl(zeile) {
   const wunsch = rest.join(' ').trim();
   switch (kommando) {
     case '/live':
-      S.live = wunsch ? wunsch !== 'aus' : !S.live;
-      console.log(S.live ? 'Live an — du siehst die autonome Arbeit.' : 'Live aus — /live blendet den Strom wieder ein.');
+      S.live = wunsch ? !['aus', 'off'].includes(wunsch.toLowerCase()) : !S.live;
+      console.log(S.live
+        ? tx('Live an — du siehst die autonome Arbeit.', 'Live on — you see the autonomous work.')
+        : tx('Live aus — /live blendet den Strom wieder ein.', 'Live off — /live shows the stream again.'));
       return;
+    case '/focus':
     case '/fokus': {
       await ladeGespraeche();
       if (!wunsch) {
@@ -104,29 +115,47 @@ async function befehl(zeile) {
         return;
       }
       const g = S.gespraeche[Number(wunsch) - 1] ?? S.gespraeche.find((x) => x.titel.toLowerCase().includes(wunsch.toLowerCase()));
-      if (!g) return console.log('Kein solches Gespräch.');
+      if (!g) return console.log(tx('Kein solches Gespräch.', 'No such conversation.'));
       S.fokus = g.id;
-      console.log(`Fokus: ${g.titel}`);
+      console.log(`${tx('Fokus', 'Focus')}: ${g.titel}`);
       return;
     }
+    case '/help':
     case '/hilfe':
-      console.log('/live [an|aus]  /fokus [nr|text]  /hilfe  /ende — sonst: Nachricht an den Fokus');
+      console.log(tx(
+        '/live [an|aus]  /fokus [nr|text]  /hilfe  /ende — sonst: Nachricht an den Fokus',
+        '/live [on|off]  /focus [no|text]  /help  /quit — anything else: message to the focused conversation',
+      ));
       return;
+    case '/quit':
     case '/ende':
       process.exit(0);
       return;
     default:
-      console.log('Unbekannter Befehl. /hilfe zeigt die Liste.');
+      console.log(tx('Unbekannter Befehl. /hilfe zeigt die Liste.', 'Unknown command. /help shows the list.'));
   }
 }
 
 async function main() {
   if (!TOKEN) {
-    console.error('Kein Token: --token, FYOS_RUNNER_TOKEN oder ~/.fyos/runner/token (legt der Runner beim ersten Start an).');
+    console.error(tx(
+      'Kein Token: --token, FYOS_RUNNER_TOKEN oder ~/.fyos/runner/token (legt der Runner beim ersten Start an).',
+      'No token: --token, FYOS_RUNNER_TOKEN or ~/.fyos/runner/token (the runner creates it on first start).',
+    ));
     process.exit(1);
   }
+  if (!festeSprache) {
+    try {
+      EN = /^en/i.test(String((await api('/api/konfiguration')).sprache ?? ''));
+    } catch {
+      /* an older runner without the setting: German */
+    }
+  }
   await ladeGespraeche();
-  console.log(`Verbunden mit ${URL_BASIS} · Fokus: ${titel(S.fokus)} · Live ${S.live ? 'an' : 'aus'} (/live, /hilfe)`);
+  console.log(tx(
+    `Verbunden mit ${URL_BASIS} · Fokus: ${titel(S.fokus)} · Live ${S.live ? 'an' : 'aus'} (/live, /hilfe)`,
+    `Connected to ${URL_BASIS} · focus: ${titel(S.fokus)} · live ${S.live ? 'on' : 'off'} (/live, /help)`,
+  ));
   void strom();
   rl.prompt();
   rl.on('line', async (zeile) => {
@@ -141,7 +170,7 @@ async function main() {
         // Schreiben verschiebt nur den Fokus (er liegt schon hier); der Strom bleibt, wie er ist.
       }
     } catch (fehler) {
-      console.error(`Fehler: ${fehler.message}`);
+      console.error(`${tx('Fehler', 'Error')}: ${fehler.message}`);
     }
     rl.prompt();
   });
@@ -149,6 +178,6 @@ async function main() {
 }
 
 main().catch((fehler) => {
-  console.error(`Start fehlgeschlagen: ${fehler.message}`);
+  console.error(`${tx('Start fehlgeschlagen', 'Start failed')}: ${fehler.message}`);
   process.exit(1);
 });

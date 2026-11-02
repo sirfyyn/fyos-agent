@@ -16,6 +16,7 @@ import { ARBEIT_VORGABE, arbeitKonfig } from './arbeit-konfig.js';
 import { schattenKonfig } from './schatten-konfig.js';
 import { wurzelnLesen } from './ordner.js';
 import { sperreLesen } from './sperre.js';
+import { SPRACHE_VORGABE, spracheNormalisieren } from './i18n.js';
 
 export const PAKET = dirname(dirname(fileURLToPath(import.meta.url)));
 export const REPO_RUNNER = resolve(PAKET, '..');
@@ -338,6 +339,9 @@ export function konfigurationLaden(quelle = configPfad(), env = process.env) {
   if (e.FYOS_STEUER_PORT) basis.steuer = { ...(basis.steuer ?? {}), port: zahl(e.FYOS_STEUER_PORT, 18435) };
   if (e.FYOS_AGENT_ID) basis.agent = e.FYOS_AGENT_ID;
 
+  // Language of the texts people and the model read (src/i18n.js): environment before file; default German, in local mode
+  // English (the local mode is the public one). Persona sets nothing and stays German.
+  pd.sprache = spracheNormalisieren(e.FYOS_RUNNER_SPRACHE) ?? spracheNormalisieren(pd.sprache) ?? (lokal ? 'en' : SPRACHE_VORGABE);
   pd.host = text(e.FYOS_RUNNER_HOST, pd.host);
   pd.port = zahl(e.FYOS_RUNNER_PORT, pd.port);
   pd.token = text(e.FYOS_RUNNER_TOKEN, pd.token);
@@ -518,6 +522,7 @@ export function oeffentlicheSicht(cfg) {
   return {
     agent: cfg.agent,
     hub: cfg.hub,
+    sprache: pd.sprache ?? SPRACHE_VORGABE,
     device: pd.device,
     port: pd.port,
     storage: pd.storage,

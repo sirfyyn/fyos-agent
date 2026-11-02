@@ -1,7 +1,7 @@
-# Bild bauen und nach ghcr.io schieben: nur auf einen Tag v* oder von Hand (Actions, bilder, "Run workflow").
-#   ghcr.io/<besitzer>/fyos-agent/runner   (runner/Dockerfile, Kontext runner/; der Installer zieht es mit FYOS_REGISTRY=ghcr.io/<besitzer>)
-# Tags: der Name des Tags (v0.2.1) oder des Zweigs und die Commit-SHA; auf einen Tag ohne Bindestrich zusätzlich latest.
-# Angemeldet wird mit dem Laufzeit-Token (packages: write), eigene Geheimnisse gibt es nicht.
+# Build the image and push it to ghcr.io: only on a v* tag or by hand (Actions, bilder, "Run workflow").
+#   ghcr.io/<owner>/fyos-agent/runner   (runner/Dockerfile, context runner/; the installer pulls it with FYOS_REGISTRY=ghcr.io/<owner>)
+# Tags: the tag name (v0.3.0) or branch and the commit SHA; on a tag without a hyphen also latest.
+# Login uses the runtime token (packages: write); no secrets of its own.
 name: bilder
 
 on:
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Bildname festlegen (ghcr.io verlangt Kleinbuchstaben)
+      - name: Set the image name (ghcr.io requires lowercase)
         run: echo "BILD=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fyos-agent/runner" >> "$GITHUB_ENV"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -58,6 +58,6 @@ jobs:
             org.opencontainers.image.description=FYOS agent: durable runner on pi-durable with hub tools and approvals
             org.opencontainers.image.version=${{ github.ref_name }}
             org.opencontainers.image.revision=${{ github.sha }}
-      - name: Runner im Bild prüfen (ohne Token verweigert er den Start nicht still, mit Token lädt die Konfiguration)
+      - name: Check the runner in the image (with a token the configuration loads)
         run: |
           docker run --rm "${BILD}:${GITHUB_SHA}" node -e "import('/opt/fyos-agent/src/config.js').then(m => { const c = m.konfigurationLaden({}, { FYOS_RUNNER_CONTAINER: '1', FYOS_RUNNER_HOST: '0.0.0.0', FYOS_RUNNER_TOKEN: 'x'.repeat(32) }); if (m.bindungPruefen(c.pi_durable).fehler) process.exit(1); console.log('ok', c.pi_durable.port) })"

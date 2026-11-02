@@ -195,6 +195,8 @@ export class Arbeitsschleife {
     jetzt = () => Date.now(),
   } = {}) {
     this.k = arbeitKonfig(cfg.pi_durable?.arbeitsschleife);
+    /** Wer Freigaben erteilt (itsm.besitzer; Persona: max, Distribution: besitzer). */
+    this.besitzer = String(cfg.itsm?.besitzer || 'max').toLowerCase();
     this.an = this.k.an;
     this.agent = String(cfg.agent || 'persona').toLowerCase();
     this.hub = hub;
@@ -367,7 +369,7 @@ export class Arbeitsschleife {
       besitz = false; // unlesbar heißt: nicht belegt
     }
     let einstufung = null;
-    const hatFreigabe = freigabePruefen(vorgang, { jetzt, maxTage: this.k.schreiben_klein_freigabe_max_tage }).erteilt;
+    const hatFreigabe = freigabePruefen(vorgang, { jetzt, maxTage: this.k.schreiben_klein_freigabe_max_tage, besitzer: this.besitzer }).erteilt;
     if (besitz && !hatFreigabe && kand.stufe === 'klein') {
       try {
         const text = `${vorgang.titel ?? ''}\n${vorgang.beschreibung ?? ''}`.slice(0, 4000);
@@ -377,7 +379,7 @@ export class Arbeitsschleife {
         einstufung = null;
       }
     }
-    const e = schreibEignung({ vorgang, stufe: kand.stufe ?? null, einstufung, besitz, k: this.k, jetzt });
+    const e = schreibEignung({ vorgang, stufe: kand.stufe ?? null, einstufung, besitz, k: this.k, jetzt, besitzer: this.besitzer });
     this._eignung.set(kand.id, { bis: jetzt + EIGNUNG_CACHE_MS, e });
     return e;
   }

@@ -14,6 +14,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { Schema as Type, werkzeug as defineTool } from './lauf/index.js';
+import { tx } from './i18n.js';
 
 const KURZ = (s, n) => {
   const t = String(s ?? '');
@@ -236,13 +237,20 @@ export class Browser {
 export function browserWerkzeuge({ cfg, browser = new Browser(cfg) }) {
   const werkzeug = defineTool({
     name: 'browser',
-    description:
+    description: tx(
       'Bedient einen echten Chromium/Chrome mit eigenem, dauerhaftem Profil (Anmeldungen bleiben erhalten). ' +
-      'Aktionen: oeffnen (url), klicken (selector oder text), tippen (selector + eingabe, optional abschicken), ' +
-      'taste (z. B. Enter, Tab, ctrl+l), scrollen (richtung/pixel), js (code), zurueck, sehen (Bildschirmfoto), ' +
-      'text (lesbarer Seiteninhalt + Links + Formularfelder), schliessen. ' +
-      'Nach dem Öffnen steht der Seiteninhalt als Text bereit; mit sehen bekommst du zusätzlich ein Bild. ' +
-      'Für FYOS-Wissen zuerst hub_suchen, für reines Lesen ohne Interaktion web_holen.',
+        'Aktionen: oeffnen (url), klicken (selector oder text), tippen (selector + eingabe, optional abschicken), ' +
+        'taste (z. B. Enter, Tab, ctrl+l), scrollen (richtung/pixel), js (code), zurueck, sehen (Bildschirmfoto), ' +
+        'text (lesbarer Seiteninhalt + Links + Formularfelder), schliessen. ' +
+        'Nach dem Öffnen steht der Seiteninhalt als Text bereit; mit sehen bekommst du zusätzlich ein Bild. ' +
+        'Für FYOS-Wissen zuerst hub_suchen, für reines Lesen ohne Interaktion web_holen.',
+      'Drives a real Chromium/Chrome with its own durable profile (sign-ins persist). ' +
+        'Actions: oeffnen (open url), klicken (click selector or text), tippen (type: selector + eingabe, optionally abschicken = submit), ' +
+        'taste (key, e.g. Enter, Tab, ctrl+l), scrollen (scroll richtung/pixel), js (code), zurueck (back), sehen (screenshot), ' +
+        'text (readable page content + links + form fields), schliessen (close). ' +
+        'After opening, the page content is available as text; sehen adds an image. ' +
+        'For FYOS knowledge use hub_suchen first, for plain reading without interaction web_holen.',
+    ),
     parameters: Type.Object({
       aktion: Type.Union([
         Type.Literal('oeffnen'),
@@ -255,18 +263,18 @@ export function browserWerkzeuge({ cfg, browser = new Browser(cfg) }) {
         Type.Literal('sehen'),
         Type.Literal('text'),
         Type.Literal('schliessen'),
-      ], { description: 'Was der Browser tun soll' }),
-      url: Type.Optional(Type.String({ description: 'Bei oeffnen: http/https/file/about-Adresse oder nackte Domain' })),
-      selector: Type.Optional(Type.String({ description: 'CSS-Selektor, z. B. #suche, input[name="q"], button[type="submit"]' })),
-      text: Type.Optional(Type.String({ description: 'Bei klicken: sichtbarer Link-/Knopftext (alternativ zu selector)' })),
-      eingabe: Type.Optional(Type.String({ description: 'Bei tippen: Text zum Ausfüllen' })),
-      abschicken: Type.Optional(Type.Boolean({ description: 'Bei tippen: danach Enter drücken (Vorgabe: false)' })),
-      taste: Type.Optional(Type.String({ description: 'Bei taste: Playwright-Taste, z. B. Enter, Tab, Escape, ctrl+l' })),
+      ], { description: tx('Was der Browser tun soll', 'What the browser should do') }),
+      url: Type.Optional(Type.String({ description: tx('Bei oeffnen: http/https/file/about-Adresse oder nackte Domain', 'For oeffnen: http/https/file/about address or bare domain') })),
+      selector: Type.Optional(Type.String({ description: tx('CSS-Selektor, z. B. #suche, input[name="q"], button[type="submit"]', 'CSS selector, e.g. #search, input[name="q"], button[type="submit"]') })),
+      text: Type.Optional(Type.String({ description: tx('Bei klicken: sichtbarer Link-/Knopftext (alternativ zu selector)', 'For klicken: visible link/button text (instead of selector)') })),
+      eingabe: Type.Optional(Type.String({ description: tx('Bei tippen: Text zum Ausfüllen', 'For tippen: text to fill in') })),
+      abschicken: Type.Optional(Type.Boolean({ description: tx('Bei tippen: danach Enter drücken (Vorgabe: false)', 'For tippen: press Enter afterwards (default: false)') })),
+      taste: Type.Optional(Type.String({ description: tx('Bei taste: Playwright-Taste, z. B. Enter, Tab, Escape, ctrl+l', 'For taste: Playwright key, e.g. Enter, Tab, Escape, ctrl+l') })),
       richtung: Type.Optional(Type.Union([Type.Literal('oben'), Type.Literal('unten'), Type.Literal('links'), Type.Literal('rechts')])),
-      pixel: Type.Optional(Type.Number({ description: 'Bei scrollen: Pixel (Vorgabe 600)' })),
-      code: Type.Optional(Type.String({ description: 'Bei js: JavaScript-Ausdruck oder async-Funktionskörper; Rückgabe wird JSON' })),
-      index: Type.Optional(Type.Number({ minimum: 0, description: 'Bei mehreren Treffern: der wievielte (0-basiert)' })),
-      bild: Type.Optional(Type.Boolean({ description: 'Nach der Aktion ein Bildschirmfoto als Bild mitliefern' })),
+      pixel: Type.Optional(Type.Number({ description: tx('Bei scrollen: Pixel (Vorgabe 600)', 'For scrollen: pixels (default 600)') })),
+      code: Type.Optional(Type.String({ description: tx('Bei js: JavaScript-Ausdruck oder async-Funktionskörper; Rückgabe wird JSON', 'For js: JavaScript expression or async function body; the result becomes JSON') })),
+      index: Type.Optional(Type.Number({ minimum: 0, description: tx('Bei mehreren Treffern: der wievielte (0-basiert)', 'With several matches: which one (0-based)') })),
+      bild: Type.Optional(Type.Boolean({ description: tx('Nach der Aktion ein Bildschirmfoto als Bild mitliefern', 'Include a screenshot as an image after the action') })),
     }),
     replay: 'unsafe',
     execute: async (p, _api, context) => {

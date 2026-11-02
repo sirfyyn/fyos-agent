@@ -4,7 +4,10 @@
  * Der Client hält keinen eigenen Verlauf. Er liest den Snapshot aus der SSE-Verbindung,
  * wendet die pi-durable-Ereignisse an und zeichnet daraus das Gespräch. Jede Schaltfläche
  * spricht mit dem Runner; nichts wird nur lokal „gespeichert“ und später verloren.
+ * Visible texts go through `t()` (public/i18n.js): German is the key, English comes from the table.
  */
+import { t, ortsform, seiteUebersetzen, sprache } from './i18n.js';
+const tr = t;
 const $ = (auswahl, wurzel = document) => wurzel.querySelector(auswahl);
 const $$ = (auswahl, wurzel = document) => [...wurzel.querySelectorAll(auswahl)];
 
@@ -80,17 +83,17 @@ function zeit(ts) {
   if (!ts) return '';
   const d = new Date(Number(ts));
   if (Number.isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(d);
+  return new Intl.DateTimeFormat(ortsform(), { dateStyle: 'short', timeStyle: 'short' }).format(d);
 }
 
 function relativ(ts) {
   if (!ts) return '';
   const ms = Date.now() - Number(ts);
   if (!Number.isFinite(ms) || ms < 0) return zeit(ts);
-  if (ms < 60_000) return 'gerade';
-  if (ms < 3_600_000) return `vor ${Math.floor(ms / 60_000)} min`;
-  if (ms < 86_400_000) return `vor ${Math.floor(ms / 3_600_000)} h`;
-  if (ms < 7 * 86_400_000) return `vor ${Math.floor(ms / 86_400_000)} d`;
+  if (ms < 60_000) return t('gerade');
+  if (ms < 3_600_000) return t('vor {n} min', { n: Math.floor(ms / 60_000) });
+  if (ms < 86_400_000) return t('vor {n} h', { n: Math.floor(ms / 3_600_000) });
+  if (ms < 7 * 86_400_000) return t('vor {n} d', { n: Math.floor(ms / 86_400_000) });
   return zeit(ts);
 }
 
@@ -119,8 +122,8 @@ function inhaltText(inhalt) {
       if (!block || typeof block !== 'object') return String(block ?? '');
       if (block.type === 'text') return block.text ?? '';
       if (block.type === 'thinking') return '';
-      if (block.type === 'image') return '[Bild]';
-      if (block.type === 'toolCall') return `[Werkzeug ${block.name ?? '?'}]`;
+      if (block.type === 'image') return t('[Bild]');
+      if (block.type === 'toolCall') return t('[Werkzeug {name}]', { name: block.name ?? '?' });
       return wertText(block);
     })
     .filter(Boolean)
@@ -150,7 +153,7 @@ function eintragZeit(eintrag) {
 }
 
 function fehlerText(fehler) {
-  if (!fehler) return 'Unbekannter Fehler';
+  if (!fehler) return t('Unbekannter Fehler');
   const text = String(fehler.message ?? fehler);
   return text.length > 500 ? text.slice(0, 499) + '…' : text;
 }
@@ -168,7 +171,7 @@ function fehlerMelden(fehler) {
     }
     wechsleTab('erweitern');
     setTimeout(() => $('#token-feld')?.focus(), 80);
-    $('#token-status').textContent = 'Der Token fehlt oder ist falsch. Bitte hier eintragen.';
+    $('#token-status').textContent = t('Der Token fehlt oder ist falsch. Bitte hier eintragen.');
   }
 }
 
@@ -211,7 +214,7 @@ function sseUrl(pfad) {
 async function api(pfad, { methode = 'GET', koerper, timeoutMs = 45_000 } = {}) {
   const u = url(pfad, S.token ? { token: S.token } : {});
   const steuerung = new AbortController();
-  const timer = setTimeout(() => steuerung.abort(new Error('Zeitüberschreitung')), timeoutMs);
+  const timer = setTimeout(() => steuerung.abort(new Error(t('Zeitüberschreitung'))), timeoutMs);
   try {
     const kopf = { Accept: 'application/json' };
     if (S.token) kopf.Authorization = `Bearer ${S.token}`;
@@ -238,7 +241,7 @@ async function api(pfad, { methode = 'GET', koerper, timeoutMs = 45_000 } = {}) 
     }
     return daten;
   } catch (fehler) {
-    if (fehler?.name === 'AbortError') throw new Error('Der Runner antwortet nicht rechtzeitig.');
+    if (fehler?.name === 'AbortError') throw new Error(t('Der Runner antwortet nicht rechtzeitig.'));
     throw fehler;
   } finally {
     clearTimeout(timer);
@@ -349,7 +352,7 @@ function renderTop() {
   if (bereich?.titel) teile.push(bereich.titel);
   if (meta?.modell) teile.push(meta.modell);
   else if (S.cfg?.model?.default) teile.push(S.cfg.model.default);
-  teile.push(S.busy ? 'arbeitet …' : 'bereit');
+  teile.push(S.busy ? t('arbeitet …') : t('bereit'));
   $('#gespraech-untertitel').textContent = teile.join(' · ');
 
   const status = $('#top-status');
@@ -358,10 +361,10 @@ function renderTop() {
     const s = el('span', `marke ${klasse}`.trim(), text);
     status.appendChild(s);
   };
-  if (S.busy) chip('arbeitet', 'laeuft');
-  if (S.health?.hub) chip(S.health.hub.ok ? 'Hub ok' : 'Hub offline', S.health.hub.ok ? 'fertig' : 'fehler');
+  if (S.busy) chip(t('arbeitet'), 'laeuft');
+  if (S.health?.hub) chip(S.health.hub.ok ? t('Hub ok') : t('Hub offline'), S.health.hub.ok ? 'fertig' : 'fehler');
   if (S.token) chip('Token', '');
-  if (S.aufgaben?.tasks?.length) chip(`${S.aufgaben.tasks.length} Aufgaben`, '');
+  if (S.aufgaben?.tasks?.length) chip(t('{n} Aufgaben', { n: S.aufgaben.tasks.length }), '');
 }
 
 function renderGeraet() {
@@ -370,7 +373,7 @@ function renderGeraet() {
   box.innerHTML = '';
   const cfg = S.cfg;
   if (!cfg) {
-    box.appendChild(el('div', 'daten', 'Noch keine Verbindung.'));
+    box.appendChild(el('div', 'daten', t('Noch keine Verbindung.')));
     return;
   }
   const d = cfg.device ?? {};
@@ -383,12 +386,12 @@ function renderGeraet() {
     ['Vorfahrt', cfg.model?.max ?? '?'],
     ['Speicher', cfg.storage ?? '?'],
     ['Port', cfg.port ?? '?'],
-    ['Token', cfg.tokenGesetzt ? 'gesetzt' : 'nicht gesetzt'],
+    ['Token', cfg.tokenGesetzt ? t('gesetzt') : t('nicht gesetzt')],
     ['Version', cfg.version ? `v${cfg.version}` : '?'],
   ];
   for (const [k, v] of daten) {
     const e = el('div', 'daten');
-    e.appendChild(el('span', '', k));
+    e.appendChild(el('span', '', t(k)));
     e.appendChild(el('strong', '', v));
     e.title = String(v);
     box.appendChild(e);
@@ -417,7 +420,7 @@ function renderSidebar() {
     const zeichen = g.art === 'root' ? 'FY' : g.art === 'zweig' ? '⑂' : 'A';
     b.appendChild(el('span', 'gespraech-zeichen', zeichen));
     const text = el('span', 'gespraech-text');
-    text.appendChild(el('span', 'gespraech-name', g.titel || 'Ohne Titel'));
+    text.appendChild(el('span', 'gespraech-name', g.titel || t('Ohne Titel')));
     const unter = [S.bereiche[g.arbeitsbereich]?.titel, relativ(g.erstellt)].filter(Boolean).join(' · ');
     text.appendChild(el('span', 'gespraech-meta', unter || g.id.slice(0, 10)));
     b.appendChild(text);
@@ -427,7 +430,7 @@ function renderSidebar() {
     });
     liste.appendChild(b);
   }
-  if (!sortiert.length) liste.appendChild(el('p', 'mini', 'Noch kein Gespräch.'));
+  if (!sortiert.length) liste.appendChild(el('p', 'mini', t('Noch kein Gespräch.')));
 
   $('#gespraech-zaehler').textContent = String(sortiert.length);
   const offen = S.freigaben.filter((f) => f.status === 'offen');
@@ -439,12 +442,12 @@ function renderSidebar() {
   for (const f of offen.slice(0, 5)) {
     const b = el('button', 'freigabe-mini');
     b.type = 'button';
-    b.appendChild(el('strong', '', f.aktion || 'Freigabe'));
-    b.appendChild(el('span', '', `${f.risiko === 'high' ? 'hohes' : f.risiko === 'low' ? 'niedriges' : 'mittleres'} Risiko · ${relativ(f.erstellt)}`));
+    b.appendChild(el('strong', '', f.aktion || t('Freigabe')));
+    b.appendChild(el('span', '', t(f.risiko === 'high' ? 'hohes Risiko · {wann}' : f.risiko === 'low' ? 'niedriges Risiko · {wann}' : 'mittleres Risiko · {wann}', { wann: relativ(f.erstellt) })));
     b.addEventListener('click', () => oeffneFreigabe(f.id));
     kurz.appendChild(b);
   }
-  if (!offen.length) kurz.appendChild(el('p', 'mini', 'Nichts offen.'));
+  if (!offen.length) kurz.appendChild(el('p', 'mini', t('Nichts offen.')));
 
   $('#version').textContent = S.cfg?.version ? `v${S.cfg.version}` : 'v0.1';
   renderTop();
@@ -496,7 +499,7 @@ async function oeffneGespraech(id) {
   renderSidebar();
   renderChat();
   renderStrom();
-  setzeVerbindung('wartet', 'lade Gespräch …');
+  setzeVerbindung('wartet', t('lade Gespräch …'));
 
   try {
     const a = await api(`api/gespraech/${encodeURIComponent(id)}/ansicht?voll=1`);
@@ -540,7 +543,7 @@ function starteGespraechsSse(id) {
       if (!key) continue;
       S.tools.set(key, {
         id: key,
-        name: slot.name ?? 'Werkzeug',
+        name: slot.name ?? t('Werkzeug'),
         args: slot.arguments ?? {},
         output: typeof slot.output === 'string' ? slot.output : '',
         details: slot.details ?? null,
@@ -548,7 +551,7 @@ function starteGespraechsSse(id) {
         status: slot.status === 'done' ? 'fertig' : 'running',
       });
     }
-    setzeVerbindung('an', 'verbunden', S.cfg?.hub ?? '');
+    setzeVerbindung('an', t('verbunden'), S.cfg?.hub ?? '');
     renderChat();
     renderTop();
   });
@@ -564,11 +567,11 @@ function starteGespraechsSse(id) {
     if (Array.isArray(liste)) verarbeiteEreignisse(liste);
   });
   es.onopen = () => {
-    if (S.sse === es) setzeVerbindung('an', 'verbunden', S.cfg?.hub ?? '');
+    if (S.sse === es) setzeVerbindung('an', t('verbunden'), S.cfg?.hub ?? '');
   };
   es.onerror = () => {
     if (S.sse !== es) return;
-    setzeVerbindung('wartet', 'unterbrochen · verbinde …', S.cfg?.hub ?? '');
+    setzeVerbindung('wartet', t('unterbrochen · verbinde …'), S.cfg?.hub ?? '');
   };
 }
 
@@ -676,7 +679,7 @@ function verarbeiteEreignisse(ereignisse) {
           fuegeEintragHinzu(ev.entry);
           neu = true;
           if (ev.entry.kind === 'fyos.freigabe-entscheidung') {
-            toast(`Freigabe ${ev.entry.data?.entscheidung ?? 'entschieden'}.`);
+            toast(t('Freigabe {entscheidung}.', { entscheidung: t(ev.entry.data?.entscheidung ?? 'entschieden') }));
           }
         }
         break;
@@ -686,7 +689,7 @@ function verarbeiteEreignisse(ereignisse) {
         if (!id) break;
         S.tools.set(id, {
           id,
-          name: ev.toolName ?? 'Werkzeug',
+          name: ev.toolName ?? t('Werkzeug'),
           args: ev.args ?? {},
           output: '',
           details: null,
@@ -754,18 +757,18 @@ function verarbeiteEreignisse(ereignisse) {
       case 'inbox_update':
         break;
       case 'task_failed':
-        toast(`Aufgabe fehlgeschlagen: ${ev.message ?? ev.kind ?? ''}`, true);
+        toast(t('Aufgabe fehlgeschlagen: {grund}', { grund: ev.message ?? ev.kind ?? '' }), true);
         break;
       case 'auto_retry_start':
-        toast(`Modell antwortet nicht; neuer Versuch ${ev.attempt ?? ''}.`);
+        toast(t('Modell antwortet nicht; neuer Versuch {n}.', { n: ev.attempt ?? '' }));
         break;
       case 'auto_retry_end':
         break;
       case 'compaction_start':
-        toast('Verdichte Verlauf …');
+        toast(t('Verdichte Verlauf …'));
         break;
       case 'compaction_end':
-        if (ev.error) toast(`Verdichten fehlgeschlagen: ${ev.error.message ?? ev.error}`, true);
+        if (ev.error) toast(t('Verdichten fehlgeschlagen: {grund}', { grund: ev.error.message ?? ev.error }), true);
         break;
       case 'agent_changed':
         S.agent = ev.agent;
@@ -787,7 +790,7 @@ function verarbeiteEreignisse(ereignisse) {
           if (!key) continue;
           S.tools.set(key, {
             id: key,
-            name: slot.name ?? 'Werkzeug',
+            name: slot.name ?? t('Werkzeug'),
             args: slot.arguments ?? {},
             output: typeof slot.output === 'string' ? slot.output : '',
             details: slot.details ?? null,
@@ -821,7 +824,7 @@ function naheUnten() {
 
 function nachricht(rolle, name, inhalt, zeitWert, extraKlasse = '') {
   const wrap = el('div', `nachricht ${rolle} ${extraKlasse}`.trim());
-  wrap.appendChild(el('div', 'nachricht-zeichen', rolle === 'mensch' ? 'Du' : rolle === 'system' ? '·' : 'FY'));
+  wrap.appendChild(el('div', 'nachricht-zeichen', rolle === 'mensch' ? t('Du') : rolle === 'system' ? '·' : 'FY'));
   const blase = el('div', 'blase');
   const kopf = el('div', 'blase-kopf');
   kopf.appendChild(el('strong', '', name));
@@ -843,16 +846,16 @@ function werkzeugKarte({ id, name, args, result }) {
   const karte = el('div', 'werkzeug-karte');
   const kopf = el('div', 'werkzeug-kopf');
   if (t?.status === 'running') kopf.appendChild(el('span', 'spinner'));
-  kopf.appendChild(el('span', 'name', name || t?.name || 'Werkzeug'));
+  kopf.appendChild(el('span', 'name', name || t?.name || tr('Werkzeug')));
   const ausgabe = ergebnisText(result) || t?.output || '';
   const istFehler = !!result?.isError || t?.status === 'error';
-  const statusText = istFehler ? 'Fehler' : t?.status === 'running' ? 'läuft' : result || t?.status === 'fertig' ? 'fertig' : 'offen';
+  const statusText = tr(istFehler ? 'Fehler' : t?.status === 'running' ? 'läuft' : result || t?.status === 'fertig' ? 'fertig' : 'offen');
   kopf.appendChild(el('span', `status ${istFehler ? 'fehler' : t?.status === 'running' ? 'laeuft' : 'fertig'}`, statusText));
   karte.appendChild(kopf);
 
   const details = el('details');
   if (istFehler) details.open = true;
-  const summary = el('summary', '', `Eingabe${ausgabe ? ' und Ausgabe' : ''}`);
+  const summary = el('summary', '', tr(ausgabe ? 'Eingabe und Ausgabe' : 'Eingabe'));
   details.appendChild(summary);
   const eingabe = args && Object.keys(args).length ? args : t?.args ?? {};
   details.appendChild(el('pre', '', wertText(eingabe)));
@@ -873,7 +876,7 @@ function assistantInhalt(message, results, gerendert) {
       hatText = true;
     } else if (block.type === 'thinking' && block.thinking) {
       const d = el('details', 'denken');
-      d.appendChild(el('summary', '', 'Gedanken'));
+      d.appendChild(el('summary', '', t('Gedanken')));
       d.appendChild(el('div', '', block.thinking));
       box.appendChild(d);
     } else if (block.type === 'toolCall') {
@@ -886,16 +889,16 @@ function assistantInhalt(message, results, gerendert) {
   if (!hatText && !inhalt.length) {
     const w = el('div', 'mini');
     w.appendChild(el('span', 'spinner'));
-    w.appendChild(document.createTextNode(' arbeitet …'));
+    w.appendChild(document.createTextNode(` ${t('arbeitet …')}`));
     box.appendChild(w);
   }
   if (message?.usage) {
     const u = message.usage;
     const teile = [];
-    if (u.input) teile.push(`${u.input} ein`);
-    if (u.output) teile.push(`${u.output} aus`);
+    if (u.input) teile.push(t('{n} ein', { n: u.input }));
+    if (u.output) teile.push(t('{n} aus', { n: u.output }));
     if (u.cacheRead) teile.push(`${u.cacheRead} cache`);
-    if (teile.length) box.appendChild(el('div', 'mini', `Token: ${teile.join(' · ')}`));
+    if (teile.length) box.appendChild(el('div', 'mini', t('Token: {teile}', { teile: teile.join(' · ') })));
   }
   return box;
 }
@@ -958,33 +961,33 @@ function renderChat() {
       const text = String(e.data?.text ?? '');
       if (text) {
         const inhalt = textBlock(text);
-        if (e.data?.art === 'steuern') inhalt.prepend(el('div', 'mini', 'Steuerung'));
-        strom.appendChild(nachricht('mensch', 'Du', inhalt, eintragZeit(e), e.data?.art === 'steuern' ? 'steuern' : ''));
+        if (e.data?.art === 'steuern') inhalt.prepend(el('div', 'mini', t('Steuerung')));
+        strom.appendChild(nachricht('mensch', t('Du'), inhalt, eintragZeit(e), e.data?.art === 'steuern' ? 'steuern' : ''));
       }
       continue;
     }
     if (kind === 'fyos.freigabe-entscheidung') {
       const d = e.data ?? {};
-      const text = `Freigabe ${d.id ?? ''}: ${d.entscheidung ?? 'entschieden'}${d.notiz ? ` · ${d.notiz}` : ''}`;
-      strom.appendChild(nachricht('system', 'Freigabe', textBlock(text), eintragZeit(e)));
+      const text = `${t('Freigabe {id}: {entscheidung}', { id: d.id ?? '', entscheidung: t(d.entscheidung ?? 'entschieden') })}${d.notiz ? ` · ${d.notiz}` : ''}`;
+      strom.appendChild(nachricht('system', t('Freigabe'), textBlock(text), eintragZeit(e)));
       continue;
     }
     if (kind === 'fyos.lauf.auftrag') {
-      strom.appendChild(nachricht('system', 'Lauf', textBlock(`Auftrag für Lauf ${e.data?.lauf ?? ''}: ${e.data?.titel ?? ''}`), eintragZeit(e)));
+      strom.appendChild(nachricht('system', t('Lauf'), textBlock(t('Auftrag für Lauf {lauf}: {titel}', { lauf: e.data?.lauf ?? '', titel: e.data?.titel ?? '' })), eintragZeit(e)));
       continue;
     }
     if (kind === 'pi.reset' || kind === 'pi.compaction') {
       // Kopf-Marker: neuer Kontext (leeren, /neu) oder Verdichtung. Ohne Zeile wäre der Chat danach scheinbar leer.
       const box = el('div');
-      box.appendChild(el('div', 'mini', kind === 'pi.reset' ? 'Neuer Kontext begonnen. Das Modell sieht den Verlauf darüber nicht mehr.' : 'Verlauf verdichtet. Das Modell sieht ab hier nur die Zusammenfassung und das Folgende.'));
+      box.appendChild(el('div', 'mini', t(kind === 'pi.reset' ? 'Neuer Kontext begonnen. Das Modell sieht den Verlauf darüber nicht mehr.' : 'Verlauf verdichtet. Das Modell sieht ab hier nur die Zusammenfassung und das Folgende.')));
       const zusammenfassung = inhaltText(msgs[0]?.content).trim();
       if (zusammenfassung) {
         const d = el('details', 'denken');
-        d.appendChild(el('summary', '', kind === 'pi.reset' ? 'Übergabe' : 'Zusammenfassung'));
+        d.appendChild(el('summary', '', t(kind === 'pi.reset' ? 'Übergabe' : 'Zusammenfassung')));
         d.appendChild(el('div', '', zusammenfassung));
         box.appendChild(d);
       }
-      strom.appendChild(nachricht('system', kind === 'pi.reset' ? 'Kontext' : 'Verdichtet', box, eintragZeit(e)));
+      strom.appendChild(nachricht('system', t(kind === 'pi.reset' ? 'Kontext' : 'Verdichtet'), box, eintragZeit(e)));
       continue;
     }
     if (kind.startsWith('fyos.') && !msgs.length) {
@@ -998,7 +1001,7 @@ function renderChat() {
       if (m.role === 'user') {
         const text = inhaltText(m.content);
         if (text && !menschenTexte.has(text.trim())) {
-          strom.appendChild(nachricht('mensch', 'Du', textBlock(text), m.timestamp ?? eintragZeit(e)));
+          strom.appendChild(nachricht('mensch', t('Du'), textBlock(text), m.timestamp ?? eintragZeit(e)));
         }
         continue;
       }
@@ -1011,10 +1014,10 @@ function renderChat() {
       if (m.role === 'toolResult') {
         if (m.toolCallId && toolCalls.has(m.toolCallId)) continue;
         if (m.toolCallId) gerendert.add(m.toolCallId);
-        const karte = werkzeugKarte({ id: m.toolCallId, name: m.toolName ?? 'Werkzeug', args: null, result: m });
+        const karte = werkzeugKarte({ id: m.toolCallId, name: m.toolName ?? t('Werkzeug'), args: null, result: m });
         const box = el('div');
         box.appendChild(karte);
-        strom.appendChild(nachricht('assistent', 'Werkzeug', box, m.timestamp ?? eintragZeit(e)));
+        strom.appendChild(nachricht('assistent', t('Werkzeug'), box, m.timestamp ?? eintragZeit(e)));
         continue;
       }
     }
@@ -1066,14 +1069,14 @@ function zeichneSchwanz(strom, chat, leer, resultate, toolCalls, gerendert, unte
     if (t.status !== 'running' && !t.output && !toolCalls.has(t.id)) continue;
     const box = el('div');
     box.appendChild(werkzeugKarte({ id: t.id, name: t.name, args: t.args, result: null }));
-    strom.appendChild(nachricht('assistent', 'Werkzeug', box, null));
+    strom.appendChild(nachricht('assistent', tr('Werkzeug'), box, null));
   }
 
   if (S.busy && !S.liveMessage) {
     const box = el('div');
     box.appendChild(el('span', 'spinner'));
-    box.appendChild(document.createTextNode(' arbeitet …'));
-    strom.appendChild(nachricht('system', 'Lauf', box, null));
+    box.appendChild(document.createTextNode(` ${t('arbeitet …')}`));
+    strom.appendChild(nachricht('system', t('Lauf'), box, null));
   }
 
   const hatInhalt = strom.children.length > 0;
@@ -1106,15 +1109,15 @@ function renderFreigaben() {
   const f = offen[0];
   banner.innerHTML = '';
   const box = el('div', 'inhalt-klein');
-  box.appendChild(el('strong', '', offen.length === 1 ? 'Eine Freigabe wartet' : `${offen.length} Freigaben warten`));
+  box.appendChild(el('strong', '', offen.length === 1 ? t('Eine Freigabe wartet') : t('{n} Freigaben warten', { n: offen.length })));
   // Entscheidung 586: Kurzkontext zuerst, dann die Aktion.
-  box.appendChild(el('span', '', `${f.kontext ? `${f.kontext} · ` : ''}${f.aktion ?? 'Aktion'}`));
+  box.appendChild(el('span', '', `${f.kontext ? `${f.kontext} · ` : ''}${f.aktion ?? t('Aktion')}`));
   banner.appendChild(box);
-  const ja = el('button', 'primary', 'Freigeben');
+  const ja = el('button', 'primary', t('Freigeben'));
   ja.type = 'button';
   ja.dataset.freigabe = f.id;
   ja.dataset.entscheidung = 'erteilt';
-  const nein = el('button', 'ghost gefahr', 'Ablehnen');
+  const nein = el('button', 'ghost gefahr', t('Ablehnen'));
   nein.type = 'button';
   nein.dataset.freigabe = f.id;
   nein.dataset.entscheidung = 'abgelehnt';
@@ -1126,16 +1129,16 @@ function oeffneFreigabe(id) {
   const f = S.freigaben.find((x) => x.id === id);
   if (!f) return;
   if (f.status !== 'offen') {
-    toast(`Diese Freigabe ist bereits ${f.status}.`);
+    toast(t('Diese Freigabe ist bereits {status}.', { status: t(f.status) }));
     return;
   }
   S.freigabeId = id;
   const frage = $('#freigabe-frage');
   frage.textContent = [
     f.kontext || '',
-    `Aktion: ${f.aktion || '–'}`,
-    `Risiko: ${f.risiko ?? 'medium'}${f.zerstoererisch ? ' · zerstörerisch' : ''}`,
-    f.gespraechTitel ? `Gespräch: ${f.gespraechTitel}` : '',
+    t('Aktion: {aktion}', { aktion: f.aktion || '–' }),
+    `${t('Risiko: {risiko}', { risiko: f.risiko ?? 'medium' })}${f.zerstoererisch ? t(' · zerstörerisch') : ''}`,
+    f.gespraechTitel ? t('Gespräch: {titel}', { titel: f.gespraechTitel }) : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -1154,7 +1157,7 @@ function renderZustand() {
   const werte = S.zustand?.werte ?? {};
   const keys = Object.keys(werte).sort((a, b) => a.localeCompare(b, 'de'));
   if (!keys.length) {
-    box.appendChild(el('p', 'mini', 'Noch kein geteilter Wert. Der Agent kann hier Werte ablegen; du kannst sie auch selbst setzen.'));
+    box.appendChild(el('p', 'mini', t('Noch kein geteilter Wert. Der Agent kann hier Werte ablegen; du kannst sie auch selbst setzen.')));
     return;
   }
   for (const key of keys) {
@@ -1162,10 +1165,10 @@ function renderZustand() {
     zeile.appendChild(el('div', 'zustand-schluessel', key));
     zeile.appendChild(el('pre', 'zustand-wert', typeof werte[key] === 'string' ? werte[key] : wertText(werte[key])));
     const knopf = el('div', 'knopf-zeile');
-    const bearbeiten = el('button', 'ghost', 'Bearbeiten');
+    const bearbeiten = el('button', 'ghost', t('Bearbeiten'));
     bearbeiten.type = 'button';
     bearbeiten.dataset.zustandEdit = key;
-    const loeschen = el('button', 'ghost gefahr', 'Löschen');
+    const loeschen = el('button', 'ghost gefahr', t('Löschen'));
     loeschen.type = 'button';
     loeschen.dataset.zustandDel = key;
     knopf.appendChild(bearbeiten);
@@ -1178,7 +1181,7 @@ function renderZustand() {
 function oeffneZustand(key = null) {
   S.zustandSchluessel = key;
   const form = $('#form-zustand');
-  $('#zustand-titel').textContent = key ? `Wert „${key}“` : 'Wert setzen';
+  $('#zustand-titel').textContent = key ? t('Wert „{key}“', { key }) : t('Wert setzen');
   form.elements.schluessel.value = key ?? '';
   form.elements.schluessel.readOnly = !!key;
   const wert = key ? S.zustand?.werte?.[key] : '';
@@ -1204,15 +1207,15 @@ function renderLaeufe() {
   if (!box) return;
   box.innerHTML = '';
   if (!S.laeufe.length) {
-    box.appendChild(el('p', 'mini', 'Noch kein Lauf. Ein Lauf ist ein dauerhafter Auftrag mit Phasen und eigenem Kindgespräch.'));
+    box.appendChild(el('p', 'mini', t('Noch kein Lauf. Ein Lauf ist ein dauerhafter Auftrag mit Phasen und eigenem Kindgespräch.')));
     return;
   }
   for (const l of S.laeufe) {
     const karte = el('div', 'lauf');
     const kopf = el('div', 'lauf-kopf');
-    kopf.appendChild(el('strong', '', l.titel || 'Lauf'));
+    kopf.appendChild(el('strong', '', l.titel || t('Lauf')));
     const status = l.status ?? l.taskStatus ?? 'offen';
-    kopf.appendChild(el('span', `marke ${statusKlasse(status)}`.trim(), status));
+    kopf.appendChild(el('span', `marke ${statusKlasse(status)}`.trim(), t(status)));
     if (l.phase) kopf.appendChild(el('span', 'marke', l.phase));
     if (l.quelle) kopf.appendChild(el('span', 'marke', l.quelle));
     karte.appendChild(kopf);
@@ -1220,27 +1223,27 @@ function renderLaeufe() {
     const meta = el('div', 'lauf-meta');
     meta.appendChild(el('span', '', `#${l.id}`));
     if (l.erstellt) meta.appendChild(el('span', '', zeit(l.erstellt)));
-    if (l.beendet) meta.appendChild(el('span', '', `beendet ${relativ(l.beendet)}`));
+    if (l.beendet) meta.appendChild(el('span', '', t('beendet {wann}', { wann: relativ(l.beendet) })));
     if (l.taskStatus) meta.appendChild(el('span', '', l.taskStatus));
-    if (l.freigabeId) meta.appendChild(el('span', '', `Freigabe ${l.freigabeId}`));
+    if (l.freigabeId) meta.appendChild(el('span', '', t('Freigabe {id}', { id: l.freigabeId })));
     karte.appendChild(meta);
 
     if (l.auftrag) karte.appendChild(el('p', 'lauf-text', l.auftrag));
-    if (l.antwort) karte.appendChild(el('p', 'lauf-text', `Antwort: ${l.antwort}`));
-    else if (l.fehler) karte.appendChild(el('p', 'lauf-text', `Fehler: ${l.fehler}`));
-    else if (l.notiz) karte.appendChild(el('p', 'lauf-text', `Notiz: ${l.notiz}`));
+    if (l.antwort) karte.appendChild(el('p', 'lauf-text', t('Antwort: {text}', { text: l.antwort })));
+    else if (l.fehler) karte.appendChild(el('p', 'lauf-text', t('Fehler: {text}', { text: l.fehler })));
+    else if (l.notiz) karte.appendChild(el('p', 'lauf-text', t('Notiz: {text}', { text: l.notiz })));
 
     const knoepfe = el('div', 'knopf-zeile');
     knoepfe.style.marginTop = '8px';
     if (l.kindId) {
-      const oeffnen = el('button', 'ghost', 'Kindgespräch');
+      const oeffnen = el('button', 'ghost', t('Kindgespräch'));
       oeffnen.type = 'button';
       oeffnen.dataset.laufOeffnen = l.kindId;
       knoepfe.appendChild(oeffnen);
     }
     const laeuft = /laeuft|running|arbeitet/i.test(String(l.status ?? l.taskStatus ?? ''));
     if (laeuft) {
-      const abbrechen = el('button', 'ghost gefahr', 'Abbrechen');
+      const abbrechen = el('button', 'ghost gefahr', t('Abbrechen'));
       abbrechen.type = 'button';
       abbrechen.dataset.laufAbbrechen = l.id;
       knoepfe.appendChild(abbrechen);
@@ -1271,7 +1274,7 @@ function renderWerkzeuge() {
   if (!box) return;
   box.innerHTML = '';
   if (!S.werkzeuge.length) {
-    box.appendChild(el('p', 'mini', 'Keine Werkzeuge gefunden. Ist der Hub erreichbar?'));
+    box.appendChild(el('p', 'mini', t('Keine Werkzeuge gefunden. Ist der Hub erreichbar?')));
     return;
   }
   for (const w of S.werkzeuge) {
@@ -1291,11 +1294,11 @@ function renderWerkzeuge() {
 }
 
 async function ladeWerkzeuge(q = '') {
-  $('#werkzeug-schema').textContent = 'Suche …';
+  $('#werkzeug-schema').textContent = t('Suche …');
   const d = await api(`api/werkzeuge?q=${encodeURIComponent(q)}`, { timeoutMs: 60_000 });
   S.werkzeuge = Array.isArray(d.werkzeuge) ? d.werkzeuge : [];
   renderWerkzeuge();
-  $('#werkzeug-schema').textContent = S.werkzeuge.length ? 'Wähle ein Werkzeug.' : 'Keine Treffer.';
+  $('#werkzeug-schema').textContent = S.werkzeuge.length ? t('Wähle ein Werkzeug.') : t('Keine Treffer.');
 }
 
 // ---------------------------------------------------------------------------
@@ -1307,7 +1310,7 @@ function renderKnoten() {
   if (!box) return;
   box.innerHTML = '';
   if (!S.knoten.length) {
-    box.appendChild(el('p', 'mini', 'Keine Knoten konfiguriert.'));
+    box.appendChild(el('p', 'mini', t('Keine Knoten konfiguriert.')));
     return;
   }
   for (const k of S.knoten) {
@@ -1318,20 +1321,20 @@ function renderKnoten() {
     zeile.appendChild(punkt);
     const text = el('div', 'knoten-text');
     text.appendChild(el('strong', '', k.titel || k.id));
-    text.appendChild(el('span', '', `${k.weg || k.host || '?'}${k.art ? ` · ${k.art}` : ''}${k.local ? ' · lokal' : ''}`));
+    text.appendChild(el('span', '', `${k.weg || k.host || '?'}${k.art ? ` · ${k.art}` : ''}${k.local ? t(' · lokal') : ''}`));
     if (k.antwort) text.appendChild(el('span', '', String(k.antwort).replace(/\s+/g, ' ').slice(0, 220)));
     zeile.appendChild(text);
     const status = el('div', 'knoten-status');
-    if (k.ok === true) status.textContent = `erreichbar${k.ms ? ` · ${dauer(k.ms)}` : ''}`;
-    else if (k.ok === false) status.textContent = 'nicht erreichbar';
-    else status.textContent = 'nicht geprüft';
+    if (k.ok === true) status.textContent = `${t('erreichbar')}${k.ms ? ` · ${dauer(k.ms)}` : ''}`;
+    else if (k.ok === false) status.textContent = t('nicht erreichbar');
+    else status.textContent = t('nicht geprüft');
     zeile.appendChild(status);
     box.appendChild(zeile);
   }
 }
 
 async function ladeKnoten(pruefen = false) {
-  if (pruefen) toast('Prüfe alle Knoten per ssh …');
+  if (pruefen) toast(t('Prüfe alle Knoten per ssh …'));
   const d = await api(`api/knoten${pruefen ? '?pruefen=1' : ''}`, { timeoutMs: 120_000 });
   S.knoten = Array.isArray(d.knoten) ? d.knoten : [];
   renderKnoten();
@@ -1411,14 +1414,14 @@ async function ladeKonfiguration() {
   renderSidebar();
   $('#token-hinweis').hidden = !S.token;
   $('#composer-hinweis').textContent = S.token
-    ? 'Token gesetzt. Der Lauf ist dauerhaft; alle Clients sehen denselben Stand.'
-    : 'Der Lauf ist dauerhaft. Mehrere Clients sehen denselben Stand.';
+    ? t('Token gesetzt. Der Lauf ist dauerhaft; alle Clients sehen denselben Stand.')
+    : t('Der Lauf ist dauerhaft. Mehrere Clients sehen denselben Stand.');
 }
 
 function fuelleAuswahl() {
   const bereiche = Object.entries(S.bereiche);
   const modelle = S.modelle;
-  const feld = (id, leer = 'Standard') => {
+  const feld = (id, leer = t('Standard')) => {
     const s = $(id);
     if (!s) return;
     const alt = s.value;
@@ -1440,7 +1443,7 @@ function fuelleAuswahl() {
     if (!s) return;
     const alt = s.value;
     s.innerHTML = '';
-    const o = el('option', '', 'Standard');
+    const o = el('option', '', t('Standard'));
     o.value = '';
     s.appendChild(o);
     for (const m of modelle) {
@@ -1493,19 +1496,19 @@ function tokenAusUrl() {
   if (feld) feld.value = S.token;
   $('#token-hinweis').hidden = !S.token;
   $('#token-status').textContent = S.token
-    ? 'Ein Token ist gesetzt; er wird nur an den Runner gesendet.'
-    : 'Kein Token gesetzt. Das ist nur bei 127.0.0.1 sicher.';
+    ? t('Ein Token ist gesetzt; er wird nur an den Runner gesendet.')
+    : t('Kein Token gesetzt. Das ist nur bei 127.0.0.1 sicher.');
 }
 
 async function ladeHealth() {
   try {
     const h = await api('api/health', { timeoutMs: 15_000 });
     S.health = h;
-    const hub = h.hub?.ok ? 'Hub ok' : 'Hub offline';
-    setzeVerbindung('an', 'verbunden', hub);
+    const hub = h.hub?.ok ? t('Hub ok') : t('Hub offline');
+    setzeVerbindung('an', t('verbunden'), hub);
   } catch (fehler) {
     S.health = null;
-    setzeVerbindung('aus', 'nicht verbunden', fehlerText(fehler));
+    setzeVerbindung('aus', t('nicht verbunden'), fehlerText(fehler));
   }
   renderTop();
   renderGeraet();
@@ -1523,6 +1526,7 @@ async function ladeZustand() {
 }
 
 async function starteAlles() {
+  seiteUebersetzen(document);
   tokenAusUrl();
   bindeEreignisse();
   await sicher(ladeKonfiguration);
@@ -1544,7 +1548,7 @@ async function starteAlles() {
     id = root?.id ?? null;
   }
   if (!id) {
-    const d = await sicher(() => api('api/gespraeche', { methode: 'POST', koerper: { titel: 'Hauptgespräch', arbeitsbereich: 'standard' } }));
+    const d = await sicher(() => api('api/gespraeche', { methode: 'POST', koerper: { titel: t('Hauptgespräch'), arbeitsbereich: 'standard' } }));
     if (d?.gespraech?.id) {
       await sicher(ladeGespraeche);
       id = d.gespraech.id;
@@ -1639,7 +1643,7 @@ function bindeEreignisse() {
     $('#mikro').hidden = false;
   } else {
     $('#mikro').hidden = true;
-    $('#mikro-status').textContent = 'keine Spracheingabe im Browser';
+    $('#mikro-status').textContent = t('keine Spracheingabe im Browser');
     setTimeout(() => {
       $('#mikro-status').textContent = '';
     }, 5000);
@@ -1656,20 +1660,20 @@ function bindeEreignisse() {
   $('#aktion-abbrechen')?.addEventListener('click', () => void sicher(async () => {
     if (!S.aktuellId) return;
     await api(`api/gespraech/${encodeURIComponent(S.aktuellId)}/abbrechen`, { methode: 'POST', koerper: {} });
-    toast('Abbruch angefordert.');
+    toast(t('Abbruch angefordert.'));
   }));
   $('#aktion-zweig')?.addEventListener('click', () => void sicher(async () => {
     if (!S.aktuellId) return;
-    const titel = `${S.meta?.titel ?? 'Gespräch'} · Zweig`;
+    const titel = t('{titel} · Zweig', { titel: S.meta?.titel ?? t('Gespräch') });
     const d = await api(`api/gespraech/${encodeURIComponent(S.aktuellId)}/zweig`, { methode: 'POST', koerper: { titel } });
     await ladeGespraeche();
     if (d.gespraech?.id) await oeffneGespraech(d.gespraech.id);
-    toast('Zweig angelegt.');
+    toast(t('Zweig angelegt.'));
   }));
   $('#aktion-verdichten')?.addEventListener('click', () => void sicher(async () => {
     if (!S.aktuellId) return;
     await api(`api/gespraech/${encodeURIComponent(S.aktuellId)}/verdichten`, { methode: 'POST', koerper: {} });
-    toast('Verdichten gestartet.');
+    toast(t('Verdichten gestartet.'));
   }));
 
   $('#meta-speichern')?.addEventListener('click', () => void sicher(async () => {
@@ -1677,7 +1681,7 @@ function bindeEreignisse() {
     const d = await api(`api/gespraech/${encodeURIComponent(S.aktuellId)}`, {
       methode: 'PATCH',
       koerper: {
-        titel: $('#meta-titel').value.trim() || 'Gespräch',
+        titel: $('#meta-titel').value.trim() || t('Gespräch'),
         arbeitsbereich: $('#meta-bereich').value || 'standard',
         modell: $('#meta-modell').value || null,
       },
@@ -1686,13 +1690,13 @@ function bindeEreignisse() {
     await ladeGespraeche();
     renderTop();
     metaInFormular();
-    toast('Gespräch gespeichert.');
+    toast(t('Gespräch gespeichert.'));
   }));
   $('#aktion-leeren')?.addEventListener('click', () => void sicher(async () => {
     if (!S.aktuellId) return;
-    if (!confirm('Verlauf dieses Gesprächs leeren? Das lässt sich nicht zurücknehmen.')) return;
+    if (!confirm(t('Verlauf dieses Gesprächs leeren? Das lässt sich nicht zurücknehmen.'))) return;
     await api(`api/gespraech/${encodeURIComponent(S.aktuellId)}/leeren`, { methode: 'POST', koerper: {} });
-    toast('Verlauf geleert.');
+    toast(t('Verlauf geleert.'));
   }));
 
   $('#zustand-neu')?.addEventListener('click', () => oeffneZustand());
@@ -1705,11 +1709,11 @@ function bindeEreignisse() {
     const del = e.target.closest('[data-zustand-del]');
     if (del) {
       const key = del.dataset.zustandDel;
-      if (!confirm(`Wert „${key}“ löschen?`)) return;
+      if (!confirm(t('Wert „{key}“ löschen?', { key }))) return;
       void sicher(async () => {
         await api(`api/zustand/${encodeURIComponent(key)}`, { methode: 'DELETE' });
         await ladeZustand();
-        toast('Wert gelöscht.');
+        toast(t('Wert gelöscht.'));
       });
     }
   });
@@ -1727,11 +1731,11 @@ function bindeEreignisse() {
     const abbrechen = e.target.closest('[data-lauf-abbrechen]');
     if (abbrechen) {
       const id = abbrechen.dataset.laufAbbrechen;
-      if (!confirm(`Lauf #${id} abbrechen?`)) return;
+      if (!confirm(t('Lauf #{id} abbrechen?', { id }))) return;
       void sicher(async () => {
         await api(`api/laeufe/${encodeURIComponent(id)}/abbrechen`, { methode: 'POST', koerper: {} });
         await ladeLaeufe();
-        toast('Lauf abgebrochen.');
+        toast(t('Lauf abgebrochen.'));
       });
     }
   });
@@ -1746,18 +1750,18 @@ function bindeEreignisse() {
 
   $('#knoten-pruefen')?.addEventListener('click', () => void sicher(async () => {
     await ladeKnoten(true);
-    toast('Knotenprüfung fertig.');
+    toast(t('Knotenprüfung fertig.'));
   }));
   $('#config-neu-laden')?.addEventListener('click', () => void sicher(async () => {
     await ladeKonfiguration();
     await ladeHealth();
     await ladeKnoten(false);
-    toast('Konfiguration neu geladen.');
+    toast(t('Konfiguration neu geladen.'));
   }));
 
   $('#token-speichern')?.addEventListener('click', () => void sicher(async () => {
     const t = $('#token-feld').value.trim();
-    if (!t) throw new Error('Token ist leer. Zum Löschen den Knopf „Löschen“ verwenden.');
+    if (!t) throw new Error(tr('Token ist leer. Zum Löschen den Knopf „Löschen“ verwenden.'));
     S.token = t;
     try {
       localStorage.setItem(SPEICHER.token, t);
@@ -1801,7 +1805,7 @@ function bindeEreignisse() {
       const d = await api('api/gespraeche', {
         methode: 'POST',
         koerper: {
-          titel: form.elements.titel.value.trim() || 'Neuer Agent',
+          titel: form.elements.titel.value.trim() || t('Neuer Agent'),
           arbeitsbereich: form.elements.arbeitsbereich.value || 'standard',
           modell: form.elements.modell.value || null,
         },
@@ -1809,7 +1813,7 @@ function bindeEreignisse() {
       dialog.close();
       await ladeGespraeche();
       if (d.gespraech?.id) await oeffneGespraech(d.gespraech.id);
-      toast('Agent angelegt.');
+      toast(t('Agent angelegt.'));
     });
   });
 
@@ -1823,11 +1827,11 @@ function bindeEreignisse() {
     }
     const form = e.target;
     void sicher(async () => {
-      if (!S.aktuellId) throw new Error('Kein Gespräch geöffnet.');
+      if (!S.aktuellId) throw new Error(t('Kein Gespräch geöffnet.'));
       const d = await api(`api/gespraech/${encodeURIComponent(S.aktuellId)}/laeufe`, {
         methode: 'POST',
         koerper: {
-          titel: form.elements.titel.value.trim() || 'Lauf',
+          titel: form.elements.titel.value.trim() || t('Lauf'),
           auftrag: form.elements.auftrag.value.trim(),
           arbeitsbereich: form.elements.arbeitsbereich.value || 'standard',
           modell: form.elements.modell.value || null,
@@ -1838,7 +1842,7 @@ function bindeEreignisse() {
       form.reset();
       await ladeLaeufe();
       wechsleTab('aufgaben');
-      toast(`Lauf #${d.lauf?.id ?? ''} gestartet.`);
+      toast(t('Lauf #{id} gestartet.', { id: d.lauf?.id ?? '' }));
     });
   });
 
@@ -1878,7 +1882,7 @@ function bindeEreignisse() {
     void sicher(async () => {
       await api(`api/zustand/${encodeURIComponent(key)}`, { methode: 'PUT', koerper: { wert: inhalt } });
       await ladeZustand();
-      toast('Wert gespeichert.');
+      toast(t('Wert gespeichert.'));
     });
   });
 
@@ -1925,7 +1929,7 @@ function bindeEreignisse() {
 // ---------------------------------------------------------------------------
 
 const STROM_MAX = 200;
-const hhmmss = (ts) => new Date(ts).toLocaleTimeString('de-DE', { hour12: false });
+const hhmmss = (ts) => new Date(ts).toLocaleTimeString(ortsform(), { hour12: false });
 
 function liesLive() {
   try {
@@ -1948,7 +1952,7 @@ function renderStrom() {
   const schalter = $('#aktion-live');
   if (schalter) {
     schalter.setAttribute('aria-pressed', String(S.live));
-    schalter.textContent = S.live ? 'Live' : 'Live aus';
+    schalter.textContent = S.live ? 'Live' : t('Live aus');
   }
   if (!kasten) return;
   kasten.hidden = !S.live;
@@ -1956,13 +1960,13 @@ function renderStrom() {
   const liste = $('#wirken-liste');
   liste.replaceChildren();
   if (!S.stromZeilen.length) {
-    const leer = el('li', 'wirken-leer', 'Gerade ruhig. Neue Arbeit erscheint hier von selbst.');
+    const leer = el('li', 'wirken-leer', t('Gerade ruhig. Neue Arbeit erscheint hier von selbst.'));
     leer.style.display = 'block';
     liste.append(leer);
   }
   for (const z of S.stromZeilen) {
     const li = el('li', `typ-${z.typ}${z.gespraech === S.aktuellId ? ' fokus' : ''}`);
-    li.title = `${z.titel ?? ''} · Klick: Fokus hierher`;
+    li.title = t('{titel} · Klick: Fokus hierher', { titel: z.titel ?? '' });
     li.dataset.gespraech = z.gespraech;
     li.append(el('span', 'zeit', hhmmss(z.t)));
     const was = el('span', 'was');
@@ -1975,7 +1979,7 @@ function renderStrom() {
   const jung = Date.now() - S.stromLetzte < 30_000;
   kasten.classList.toggle('ruhig', !jung);
   const zaehler = $('#wirken-zaehler');
-  if (zaehler) zaehler.textContent = S.stromLetzte ? `zuletzt ${relativ(S.stromLetzte)}` : '';
+  if (zaehler) zaehler.textContent = S.stromLetzte ? t('zuletzt {wann}', { wann: relativ(S.stromLetzte) }) : '';
 }
 
 function schliesseStromSse() {
@@ -2026,7 +2030,7 @@ function liveBefehl(text) {
   if (!m) return false;
   const wunsch = m[1]?.toLowerCase();
   setzeLive(wunsch ? wunsch !== 'aus' : !S.live);
-  toast(S.live ? 'Live an: du siehst die autonome Arbeit.' : 'Live aus: Strom ausgeblendet. /live blendet ihn wieder ein.');
+  toast(S.live ? t('Live an: du siehst die autonome Arbeit.') : t('Live aus: Strom ausgeblendet. /live blendet ihn wieder ein.'));
   return true;
 }
 
@@ -2068,13 +2072,13 @@ async function entscheideFreigabe(id, entscheidung, notiz) {
       koerper: { entscheidung, notiz, von: 'mensch' },
     });
     await ladeFreigaben();
-    toast(entscheidung === 'erteilt' ? 'Freigabe erteilt.' : 'Freigabe abgelehnt.');
+    toast(entscheidung === 'erteilt' ? t('Freigabe erteilt.') : t('Freigabe abgelehnt.'));
   });
 }
 
 function starteMikrofon() {
   if (!S.erkennen) {
-    toast('Dieser Browser hat keine Spracheingabe. Tippen funktioniert weiter.', true);
+    toast(t('Dieser Browser hat keine Spracheingabe. Tippen funktioniert weiter.'), true);
     return;
   }
   if (S.mikroLaeuft) {
@@ -2084,7 +2088,7 @@ function starteMikrofon() {
     return;
   }
   const erkennen = new S.erkennen();
-  erkennen.lang = 'de-DE';
+  erkennen.lang = sprache() === 'en' ? 'en-US' : 'de-DE';
   erkennen.interimResults = true;
   erkennen.continuous = false;
   const basis = $('#eingabe').value;
@@ -2101,7 +2105,7 @@ function starteMikrofon() {
     const text = `${basis} ${fertigText} ${zwischen}`.replace(/\s+/g, ' ').trim();
     $('#eingabe').value = text;
     $('#eingabe').dispatchEvent(new Event('input'));
-    $('#mikro-status').textContent = zwischen ? 'höre …' : 'erkannt';
+    $('#mikro-status').textContent = zwischen ? t('höre …') : t('erkannt');
   };
   erkennen.onerror = (e) => {
     S.mikroLaeuft = false;
@@ -2109,10 +2113,10 @@ function starteMikrofon() {
     $('#mikro-status').textContent = '';
     const text =
       e.error === 'not-allowed'
-        ? 'Mikrofon nicht erlaubt. Tippen funktioniert weiter.'
+        ? t('Mikrofon nicht erlaubt. Tippen funktioniert weiter.')
         : e.error === 'no-speech'
-          ? 'Nichts gehört. Noch einmal versuchen.'
-          : `Spracheingabe: ${e.error}`;
+          ? t('Nichts gehört. Noch einmal versuchen.')
+          : t('Spracheingabe: {fehler}', { fehler: e.error });
     toast(text, e.error !== 'no-speech');
   };
   erkennen.onend = () => {
@@ -2122,7 +2126,7 @@ function starteMikrofon() {
   };
   S.mikroLaeuft = true;
   $('#mikro').classList.add('an');
-  $('#mikro-status').textContent = 'höre …';
+  $('#mikro-status').textContent = t('höre …');
   try {
     erkennen.start();
   } catch (fehler) {
@@ -2138,5 +2142,5 @@ function starteMikrofon() {
 
 starteAlles().catch((fehler) => {
   fehlerMelden(fehler);
-  setzeVerbindung('aus', 'Start fehlgeschlagen', '');
+  setzeVerbindung('aus', t('Start fehlgeschlagen'), '');
 });

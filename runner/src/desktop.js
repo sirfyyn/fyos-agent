@@ -14,6 +14,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { Schema as Type, werkzeug as defineTool } from './lauf/index.js';
+import { tx } from './i18n.js';
 
 const KURZ = (s, n = 600) => {
   const t = String(s ?? '');
@@ -181,19 +182,22 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
 
   const ziel = Type.Optional(
     Type.Union([Type.Literal('agent'), Type.Literal('mensch')], {
-      description: 'agent = dein eigener Desktop (Vorgabe, ohne Freigabe); mensch = Besitzer Desktop (nur mit Freigabe)',
+      description: tx('agent = dein eigener Desktop (Vorgabe, ohne Freigabe); mensch = Besitzer Desktop (nur mit Freigabe)', 'agent = your own desktop (default, no approval); mensch = the human\'s desktop (approval only)'),
     }),
   );
   const koord = Type.Number({ minimum: 0, maximum: 20000 });
 
   const bild = defineTool({
     name: 'desktop_bild',
-    description:
+    description: tx(
       'Macht ein Bildschirmfoto von Ginnys eigenem Desktop auf Hauptserver (ziel agent) oder von Besitzer Desktop (ziel mensch) ' +
-      'und gibt es als Bild zurück. Koordinaten für desktop_klick gelten in genau diesem Bild.',
+        'und gibt es als Bild zurück. Koordinaten für desktop_klick gelten in genau diesem Bild.',
+      'Takes a screenshot of your own desktop (ziel agent) or of the human\'s desktop (ziel mensch) ' +
+        'and returns it as an image. Coordinates for desktop_klick refer to exactly this image.',
+    ),
     parameters: Type.Object({
       ziel,
-      skala: Type.Optional(Type.Number({ minimum: 0.1, maximum: 1, description: 'Bildskala (Vorgabe 0.6)' })),
+      skala: Type.Optional(Type.Number({ minimum: 0.1, maximum: 1, description: tx('Bildskala (Vorgabe 0.6)', 'Image scale (default 0.6)') })),
     }),
     replay: 'safe',
     execute: lauf((p, signal) => desktop.bild(p, signal)),
@@ -201,7 +205,7 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
 
   const fenster = defineTool({
     name: 'desktop_fenster',
-    description: 'Listet die offenen Fenster auf Ginnys Desktop (Adresse g5, Klasse, Titel, Arbeitsfläche, Fokus).',
+    description: tx('Listet die offenen Fenster auf Ginnys Desktop (Adresse g5, Klasse, Titel, Arbeitsfläche, Fokus).', 'Lists the open windows on your desktop (address g5, class, title, workspace, focus).'),
     parameters: Type.Object({ ziel }),
     replay: 'safe',
     execute: lauf((p, signal) => desktop.fenster(p, signal)),
@@ -209,9 +213,12 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
 
   const stand = defineTool({
     name: 'desktop_eingabe_stand',
-    description:
+    description: tx(
       'Sagt, ob du auf dem Desktop klicken und tippen darfst: auf Ginnys Desktop, solange Besitzer nicht übernommen hat; ' +
-      'auf Besitzer Desktop nur mit seiner Freigabe an Hauptserver.',
+        'auf Besitzer Desktop nur mit seiner Freigabe an Hauptserver.',
+      'Says whether you may click and type on the desktop: on your own desktop as long as the human has not taken over; ' +
+        'on the human\'s desktop only with their approval.',
+    ),
     parameters: Type.Object({ ziel }),
     replay: 'safe',
     execute: lauf((p, signal) => desktop.eingabeStand(p, signal)),
@@ -219,7 +226,7 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
 
   const starter = defineTool({
     name: 'desktop_starter',
-    description: 'Listet die Programme, die auf Ginnys Desktop gestartet werden dürfen (z. B. terminal, browser, dateimanager).',
+    description: tx('Listet die Programme, die auf Ginnys Desktop gestartet werden dürfen (z. B. terminal, browser, dateimanager).', 'Lists the programs that may be started on your desktop (e.g. terminal, browser, dateimanager).'),
     parameters: Type.Object({ ziel }),
     replay: 'safe',
     execute: lauf((p, signal) => desktop.starter(p, signal)),
@@ -227,9 +234,12 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
 
   const klick = defineTool({
     name: 'desktop_klick',
-    description:
+    description: tx(
       'Klickt auf den Punkt (x, y) im letzten Bildschirmfoto von desktop_bild. Mach vorher ein Foto und klicke nur, ' +
-      'was du darauf siehst. Auf Besitzer Desktop nur mit Freigabe.',
+        'was du darauf siehst. Auf Besitzer Desktop nur mit Freigabe.',
+      'Clicks the point (x, y) in the latest screenshot from desktop_bild. Take a screenshot first and click only ' +
+        'what you see on it. On the human\'s desktop only with approval.',
+    ),
     parameters: Type.Object({
       ziel,
       x: koord,
@@ -247,15 +257,18 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
         signal,
         z,
       );
-      return textErgebnis(`Geklickt (${p.taste || 'links'}${p.doppelt ? ', doppelt' : ''}). Mach ein neues Foto, um das Ergebnis zu sehen.`, d);
+      return textErgebnis(tx(`Geklickt (${p.taste || 'links'}${p.doppelt ? ', doppelt' : ''}). Mach ein neues Foto, um das Ergebnis zu sehen.`, `Clicked (${p.taste || 'links'}${p.doppelt ? ', double' : ''}). Take a new screenshot to see the result.`), d);
     }),
   });
 
   const tippen = defineTool({
     name: 'desktop_tippen',
-    description:
+    description: tx(
       'Tippt Text in das Fenster mit dem Fokus (höchstens 500 Zeichen; Zeilenumbruch drückt Return). ' +
-      'Nie Passwörter oder Schlüssel tippen. Auf Besitzer Desktop nur mit Freigabe.',
+        'Nie Passwörter oder Schlüssel tippen. Auf Besitzer Desktop nur mit Freigabe.',
+      'Types text into the focused window (at most 500 characters; a line break presses Return). ' +
+        'Never type passwords or keys. On the human\'s desktop only with approval.',
+    ),
     parameters: Type.Object({
       ziel,
       text: Type.String({ minLength: 1, maxLength: 500 }),
@@ -263,15 +276,18 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
     replay: 'unsafe',
     execute: lauf(async (p, signal) => {
       const d = await desktop.anfrage('POST', '/tippen', { text: p.text }, signal, desktop.zielVon(p));
-      return textErgebnis(`${d.zeichen ?? String(p.text).length} Zeichen getippt.`);
+      return textErgebnis(tx(`${d.zeichen ?? String(p.text).length} Zeichen getippt.`, `${d.zeichen ?? String(p.text).length} characters typed.`));
     }),
   });
 
   const taste = defineTool({
     name: 'desktop_taste',
-    description:
+    description: tx(
       'Drückt eine Taste oder Kombination mit ctrl und/oder shift: ctrl+l, Return, shift+Tab, F5, Escape. ' +
-      'Kein alt, kein super. Auf Besitzer Desktop nur mit Freigabe.',
+        'Kein alt, kein super. Auf Besitzer Desktop nur mit Freigabe.',
+      'Presses a key or a combination with ctrl and/or shift: ctrl+l, Return, shift+Tab, F5, Escape. ' +
+        'No alt, no super. On the human\'s desktop only with approval.',
+    ),
     parameters: Type.Object({
       ziel,
       kombi: Type.String({ maxLength: 40 }),
@@ -279,15 +295,18 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
     replay: 'unsafe',
     execute: lauf(async (p, signal) => {
       await desktop.anfrage('POST', '/taste', { kombi: p.kombi }, signal, desktop.zielVon(p));
-      return textErgebnis(`${p.kombi} gedrückt.`);
+      return textErgebnis(tx(`${p.kombi} gedrückt.`, `${p.kombi} pressed.`));
     }),
   });
 
   const scrollen = defineTool({
     name: 'desktop_scrollen',
-    description:
+    description: tx(
       'Dreht das Mausrad (dy negativ = nach oben, höchstens 20 Rasten); mit x und y zeigt der Zeiger vorher dorthin. ' +
-      'Auf Besitzer Desktop nur mit Freigabe.',
+        'Auf Besitzer Desktop nur mit Freigabe.',
+      'Turns the mouse wheel (negative dy = up, at most 20 notches); with x and y the pointer moves there first. ' +
+        'On the human\'s desktop only with approval.',
+    ),
     parameters: Type.Object({
       ziel,
       dy: Type.Optional(Type.Integer({ minimum: -20, maximum: 20 })),
@@ -304,15 +323,18 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
         ...(p.x !== undefined && p.y !== undefined ? { x: p.x, y: p.y, skala: desktop.skalaFuer(z) } : {}),
       };
       await desktop.anfrage('POST', '/scrollen', koerper, signal, z);
-      return textErgebnis('Gescrollt.');
+      return textErgebnis(tx('Gescrollt.', 'Scrolled.'));
     }),
   });
 
   const starten = defineTool({
     name: 'desktop_starten',
-    description:
+    description: tx(
       'Startet ein freigegebenes Programm auf Ginnys Desktop (Kennung aus desktop_starter, etwa terminal, browser, dateimanager). ' +
-      'Kein freier Befehl.',
+        'Kein freier Befehl.',
+      'Starts an allowed program on your desktop (id from desktop_starter, e.g. terminal, browser, dateimanager). ' +
+        'No free-form command.',
+    ),
     parameters: Type.Object({
       ziel,
       starter: Type.String({ maxLength: 60 }),
@@ -320,13 +342,13 @@ export function desktopWerkzeuge({ cfg, desktop = new Desktop(cfg) }) {
     replay: 'unsafe',
     execute: lauf(async (p, signal) => {
       const d = await desktop.anfrage('POST', '/starten', { starter: p.starter }, signal, desktop.zielVon(p));
-      return textErgebnis(`${d.starter || p.starter} wird gestartet.`);
+      return textErgebnis(tx(`${d.starter || p.starter} wird gestartet.`, `${d.starter || p.starter} is starting.`));
     }),
   });
 
   const fokus = defineTool({
     name: 'desktop_fokus',
-    description: 'Holt das Fenster mit dieser Adresse (aus desktop_fenster) nach vorn; die Arbeitsfläche wechselt mit.',
+    description: tx('Holt das Fenster mit dieser Adresse (aus desktop_fenster) nach vorn; die Arbeitsfläche wechselt mit.', 'Brings the window with this address (from desktop_fenster) to the front; the workspace follows.'),
     parameters: Type.Object({
       ziel,
       adresse: Type.String({ pattern: '^(0x[0-9a-f]{1,16}|g[0-9]{1,9})$' }),

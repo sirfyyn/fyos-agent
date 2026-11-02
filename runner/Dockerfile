@@ -23,7 +23,8 @@ RUN mkdir -p /home/node/.fyos && chown node:node /home/node/.fyos
 
 USER node
 # Im Container auf allen Adressen, aber nur mit Token (FYOS_RUNNER_TOKEN, mindestens 32 Zeichen; src/config.js bindungPruefen)
-ENV FYOS_RUNNER_CONFIG=/etc/fyos/agent-runner.json FYOS_RUNNER_CONTAINER=1 FYOS_RUNNER_HOST=0.0.0.0
+# The public image speaks English (texts for people and the runner's own prompt sections); FYOS_RUNNER_SPRACHE=de switches.
+ENV FYOS_RUNNER_CONFIG=/etc/fyos/agent-runner.json FYOS_RUNNER_CONTAINER=1 FYOS_RUNNER_HOST=0.0.0.0 FYOS_RUNNER_SPRACHE=en
 EXPOSE 18438
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "src/index.js"]

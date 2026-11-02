@@ -715,3 +715,20 @@ test('Durchlauf mit Faux-Modell: bei geschlossenem vollen Tor liefert der Eingan
     await runner.close().catch(() => {});
   }
 });
+
+test('Freigabe: der Besitzer kommt aus der Konfiguration (Distribution: besitzer)', () => {
+  const kopf = '## Freigabe angefragt (Prüfsumme ' + 'a'.repeat(12) + ')';
+  const vorgang = {
+    status: 'in_progress',
+    beschreibung: `${kopf}\nAufräumen`,
+    verlauf: [
+      { ts: '2026-11-02T08:00:00Z', ereignis: 'comment', wer: 'agent', text: kopf },
+      { ts: '2026-11-02T08:05:00Z', ereignis: 'updated', wer: 'besitzer', text: 'status waiting_approval→in_progress (Freigabe entschieden)' },
+    ],
+  };
+  const jetzt = Date.parse('2026-11-02T09:00:00Z');
+  assert.equal(freigabePruefen(vorgang, { jetzt }).erteilt, false); // Vorgabe max: die Distribution-Freigabe zählt nicht
+  const ja = freigabePruefen(vorgang, { jetzt, besitzer: 'besitzer' });
+  assert.equal(ja.erteilt, true, ja.grund);
+  assert.equal(ja.von, 'besitzer');
+});

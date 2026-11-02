@@ -1,7 +1,6 @@
-# Prüfen bei jedem Push und jedem Pull Request: dieselben Tests wie die Gitea-CI (.gitea/workflows/ci.yml), aber ohne
-# Bild-Bau. Das Bild baut bilder.yml, nur auf einen Tag v*.
-# Keine Geheimnisse nötig, das Laufzeit-Token darf nur lesen. Die Actions sind auf einen Commit festgenagelt, die Version
-# steht im Kommentar dahinter.
+# Checks on every push and pull request: the same tests as the Gitea CI (.gitea/workflows/ci.yml), without building the
+# image. bilder.yml builds the image, only on a v* tag.
+# No secrets needed; the runtime token is read-only. Actions are pinned to a commit, the version is in the comment.
 name: tests
 
 on:
@@ -28,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Der Runner (seit 0.2.1 der einzige Agent) braucht Node >= 22.19 und eigene Pakete.
+      # The runner (the only agent since 0.2.1) needs Node >= 22.19 and its own packages.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
@@ -43,8 +42,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      # gitleaks als offizielles Release-Binary in fester Version. Die Prüfsumme ist die Zeile linux_x64 aus
-      # gitleaks_8.30.1_checksums.txt desselben Release; passt sie nicht, bricht der Lauf ab.
+      # gitleaks as the official release binary in a fixed version. The checksum is the linux_x64 line from
+      # gitleaks_8.30.1_checksums.txt of the same release; if it does not match, the run stops.
       GITLEAKS_VERSION: "8.30.1"
       GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
     steps:
@@ -52,9 +51,9 @@ jobs:
         with:
           fetch-depth: 0 # ganze Historie für den zweiten gitleaks-Lauf
           persist-credentials: false
-      - name: Sauberkeit (keine privaten Adressen, Konten, Geheimnisse)
+      - name: Cleanliness (no private addresses, accounts, secrets)
         run: python3 tools/sauber.py .
-      - name: gitleaks laden und prüfen
+      - name: Download and verify gitleaks
         run: |
           archiv="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/$archiv" \
@@ -63,7 +62,7 @@ jobs:
           mkdir "$RUNNER_TEMP/gitleaks"
           tar -xzf "$RUNNER_TEMP/$archiv" -C "$RUNNER_TEMP/gitleaks" gitleaks
           echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
-      - name: gitleaks über den ganzen Baum
+      - name: gitleaks over the whole tree
         run: gitleaks dir . --no-banner --redact --verbose
-      - name: gitleaks über die Historie
+      - name: gitleaks over the history
         run: gitleaks git . --no-banner --redact --verbose

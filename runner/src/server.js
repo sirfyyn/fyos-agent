@@ -5,7 +5,7 @@
  * damit über einen pi-durable-Commit; keine Route hält eigenen Zustand, der einen Neustart
  * nicht überlebt. SSE ist eine Projektion der Commits, kein zweiter Speicher.
  */
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
@@ -16,6 +16,7 @@ import { dateiLesen } from './datei.js';
 import { RuheFehler } from './ruhe.js';
 import { SucheFehler } from './suche.js';
 import { VerwaltungsFehler } from './verwaltung.js';
+import { fehlerText, sprache as aktuelleSprache } from './i18n.js';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -54,6 +55,12 @@ function cookieSetzen(res, token) {
 }
 
 function json(res, status, daten) {
+  // Error answers carry German messages from many modules; they are translated once here (src/i18n.js, only with `sprache: en`).
+  if (daten && daten.ok === false && aktuelleSprache() !== 'de') {
+    daten = { ...daten };
+    if (typeof daten.fehler === 'string') daten.fehler = fehlerText(daten.fehler);
+    if (typeof daten.meldung === 'string') daten.meldung = fehlerText(daten.meldung);
+  }
   const text = JSON.stringify(daten);
   kopf(res, status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -838,6 +845,12 @@ async function statisch(req, res, pfad, clientDir) {
   });
   if (req.method === 'HEAD') {
     res.end();
+    return;
+  }
+  // The page learns its language from `<html lang>` before the first paint (public/i18n.js); the file itself says `de`.
+  if (istHtml && aktuelleSprache() !== 'de') {
+    const html = readFileSync(datei, 'utf8').replace(/<html lang="de"/, `<html lang="${aktuelleSprache()}"`);
+    res.end(html);
     return;
   }
   createReadStream(datei).pipe(res);

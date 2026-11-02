@@ -22,6 +22,10 @@
  */
 import { freigabeStimmeErlaubt } from './sprache.js';
 import { Kette, kurz, logger } from './wachen-zustand.js';
+import { tx } from './i18n.js';
+
+/** Decision word for people (`erteilt` → granted …), German stays as stored. */
+const wortFuer = (w) => tx(w, { erteilt: 'granted', abgelehnt: 'denied', offen: 'open' }[w] ?? w);
 
 /** Taste → Wirkung. Variantenselektoren werden vorher entfernt. */
 export const TASTEN = { '✅': 'erteilt', '👍': 'erteilt', '❌': 'abgelehnt', '👎': 'abgelehnt', '⏳': 'spaeter' };
@@ -155,7 +159,9 @@ export class FreigabeReaktionen {
         if (m.fertig) continue;
         const f = nachId.get(m.freigabe);
         if (f && f.status === 'offen') continue;
-        const wort = f ? `Erledigt: ${f.status}${f.entschiedenVon ? ` (${kurz(String(f.entschiedenVon), 30)})` : ''}` : 'Erledigt: Freigabe nicht mehr vorhanden';
+        const wort = f
+          ? `${tx('Erledigt', 'Done')}: ${wortFuer(f.status)}${f.entschiedenVon ? ` (${kurz(String(f.entschiedenVon), 30)})` : ''}`
+          : tx('Erledigt: Freigabe nicht mehr vorhanden', 'Done: approval no longer exists');
         await this.#abschliessen(eid, m, wort);
       }
       st = await this.#stand();
@@ -242,7 +248,10 @@ export class FreigabeReaktionen {
     if (wirkung === 'spaeter') {
       await this.zurueckstellen(f.id, this.jetzt() + this.kfg.spaeterS * 1000).catch(() => false);
       await fertig((s) => void (s.zaehler.zurueckgestellt = (Number(s.zaehler.zurueckgestellt) || 0) + 1));
-      await this.#sagen(`Freigabe ${nenn} zurückgestellt per ⏳, bleibt offen (nächste Erinnerung in ${Math.round(this.kfg.spaeterS / 60)} min).`, nenn);
+      await this.#sagen(tx(
+        `Freigabe ${nenn} zurückgestellt per ⏳, bleibt offen (nächste Erinnerung in ${Math.round(this.kfg.spaeterS / 60)} min).`,
+        `Approval ${nenn} postponed via ⏳, stays open (next reminder in ${Math.round(this.kfg.spaeterS / 60)} min).`,
+      ), nenn);
       return;
     }
     if (wirkung === 'erteilt' && !erlaubenErlaubt(f)) {
@@ -254,7 +263,10 @@ export class FreigabeReaktionen {
         await this.#aendern((s) => {
           if (s.meldungen[e.ziel]) s.meldungen[e.ziel].hinweis = true;
         });
-        await this.#sagen(`Freigabe ${nenn}: Erlauben nur in der App (Halten), Risiko ${f.risiko === 'high' ? 'hoch' : f.zerstoererisch ? 'zerstörend' : 'unbekannt'}. Ablehnen (❌) geht hier.`, nenn);
+        await this.#sagen(tx(
+          `Freigabe ${nenn}: Erlauben nur in der App (Halten), Risiko ${f.risiko === 'high' ? 'hoch' : f.zerstoererisch ? 'zerstörend' : 'unbekannt'}. Ablehnen (❌) geht hier.`,
+          `Approval ${nenn}: allow only in the app (hold), risk ${f.risiko === 'high' ? 'high' : f.zerstoererisch ? 'destructive' : 'unknown'}. Deny (❌) works here.`,
+        ), nenn);
       }
       return;
     }
@@ -274,12 +286,12 @@ export class FreigabeReaktionen {
       const name = wirkung === 'erteilt' ? 'angenommen' : 'abgelehnt';
       s.zaehler[name] = (Number(s.zaehler[name]) || 0) + 1;
     });
-    const wort = `Freigabe ${nenn} ${wirkung} per ${taste}`;
+    const wort = tx(`Freigabe ${nenn} ${wirkung} per ${taste}`, `Approval ${nenn} ${wortFuer(wirkung)} via ${taste}`);
     await this.#sagen(wort, nenn);
     // Alle Meldungen (Erinnerungen) zu dieser Freigabe als erledigt markieren, Chips zurücknehmen.
     const frisch = await this.#stand();
     for (const [eid, mm] of Object.entries(frisch.meldungen)) {
-      if (mm.freigabe === f.id && !mm.fertig) await this.#abschliessen(eid, mm, `Erledigt: ${wirkung} per ${taste}`);
+      if (mm.freigabe === f.id && !mm.fertig) await this.#abschliessen(eid, mm, tx(`Erledigt: ${wirkung} per ${taste}`, `Done: ${wortFuer(wirkung)} via ${taste}`));
     }
   }
 

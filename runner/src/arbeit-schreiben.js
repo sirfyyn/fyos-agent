@@ -84,8 +84,10 @@ export function istZerstoerend(text) {
  * (oder ein Kommentar von Besitzer kurz davor oder danach sagt erlaubt/freigegeben). Ein späteres Nein von Besitzer (widerrufen,
  * abgelehnt, stopp) hebt sie auf; ein neuer Antrag danach auch.
  */
-export function freigabePruefen(vorgang, { jetzt = Date.now(), maxTage = 30 } = {}) {
+export function freigabePruefen(vorgang, { jetzt = Date.now(), maxTage = 30, besitzer = 'max' } = {}) {
   const nein = (grund) => ({ erteilt: false, grund });
+  // Wer freigibt, steht in itsm.besitzer (Persona: max, Distribution: besitzer).
+  const ich = String(besitzer || 'max').toLowerCase();
   if (!istObjekt(vorgang)) return nein('Vorgang nicht lesbar');
   if (String(vorgang.status ?? '') !== 'in_progress') return nein(`Status ${vorgang.status ?? '?'} (nicht in_progress)`);
   const kopf = FREIGABE_KOPF.exec(String(vorgang.beschreibung ?? ''));
@@ -99,7 +101,7 @@ export function freigabePruefen(vorgang, { jetzt = Date.now(), maxTage = 30 } = 
     .sort((a, b) => a._t - b._t);
 
   const antraege = verlauf.filter(
-    (e) => e.ereignis === 'comment' && String(e.wer ?? '').toLowerCase() !== 'max' && FREIGABE_KOPF.test(String(e.text ?? '')),
+    (e) => e.ereignis === 'comment' && String(e.wer ?? '').toLowerCase() !== ich && FREIGABE_KOPF.test(String(e.text ?? '')),
   );
   const antrag = antraege.at(-1);
   if (!antrag) return nein('Freigabe-Antrag nicht im Verlauf (zu alt oder nie gestellt)');
@@ -108,24 +110,24 @@ export function freigabePruefen(vorgang, { jetzt = Date.now(), maxTage = 30 } = 
 
   const nachAntrag = verlauf.filter((e) => e._t > antrag._t);
   const erteilung = nachAntrag.find(
-    (e) => e.ereignis === 'updated' && String(e.wer ?? '').toLowerCase() === 'max' && STATUS_ERTEILT.test(String(e.text ?? '')),
+    (e) => e.ereignis === 'updated' && String(e.wer ?? '').toLowerCase() === ich && STATUS_ERTEILT.test(String(e.text ?? '')),
   );
   if (!erteilung) return nein('keine Erteilung durch Besitzer nach dem Antrag');
 
   const maxKommentare = nachAntrag.filter(
-    (e) => e.ereignis === 'comment' && String(e.wer ?? '').toLowerCase() === 'max' && Math.abs(e._t - erteilung._t) <= 120_000,
+    (e) => e.ereignis === 'comment' && String(e.wer ?? '').toLowerCase() === ich && Math.abs(e._t - erteilung._t) <= 120_000,
   );
   const sagtErteilt = /Freigabe entschieden/i.test(String(erteilung.text ?? '')) || maxKommentare.some((e) => ERTEILT_WORT.test(String(e.text ?? '')));
   const sagtNein = maxKommentare.some((e) => ABGELEHNT_WORT.test(String(e.text ?? '')));
   if (!sagtErteilt || sagtNein) return nein('Besitzer\' Statuswechsel nennt keine Freigabe');
 
   const widerruf = verlauf.find(
-    (e) => e._t > erteilung._t && String(e.wer ?? '').toLowerCase() === 'max' && WIDERRUF.test(String(e.text ?? '')),
+    (e) => e._t > erteilung._t && String(e.wer ?? '').toLowerCase() === ich && WIDERRUF.test(String(e.text ?? '')),
   );
   if (widerruf) return nein('Besitzer hat die Freigabe danach zurückgenommen');
 
   if (jetzt - erteilung._t > maxTage * TAG_MS) return nein(`Freigabe älter als ${maxTage} Tage`);
-  return { erteilt: true, summe, von: 'max', ts: erteilung.ts, grund: 'Freigabe erteilt' };
+  return { erteilt: true, summe, von: ich, ts: erteilung.ts, grund: 'Freigabe erteilt' };
 }
 
 /**
@@ -151,14 +153,14 @@ export function besitzPruefen(vorgang, uebernahmen, agent = 'persona') {
  * `stufe`: die Einstufung aus `denken.liegt` (Titel). `einstufung`: `schleifen.einstufen` über Titel und Beschreibung,
  * `null`, wenn nicht lesbar (dann kein Klein-Pfad).
  */
-export function schreibEignung({ vorgang, stufe = null, einstufung = null, besitz = false, k, jetzt = Date.now() } = {}) {
+export function schreibEignung({ vorgang, stufe = null, einstufung = null, besitz = false, k, jetzt = Date.now(), besitzer = 'max' } = {}) {
   const lesen = (warum) => ({ art: 'lesen', pfad: null, warum });
   if (!istObjekt(vorgang)) return lesen('Vorgang nicht lesbar');
   if (besitz !== true) return lesen('nicht in Ginnys Besitz');
   const text = `${vorgang.titel ?? ''}\n${vorgang.beschreibung ?? ''}`;
   const zerstoerend = istZerstoerend(text);
 
-  const frei = freigabePruefen(vorgang, { jetzt, maxTage: k?.schreiben_klein_freigabe_max_tage ?? 30 });
+  const frei = freigabePruefen(vorgang, { jetzt, maxTage: k?.schreiben_klein_freigabe_max_tage ?? 30, besitzer });
   if (frei.erteilt) {
     if (zerstoerend && k?.schreiben_klein_zerstoerend_mit_freigabe === false) {
       return lesen('enthält Zerstörendes (Konfiguration erlaubt es auch mit Freigabe nicht)');

@@ -13,6 +13,7 @@
 import { EREIGNIS, KONTEXT, ereignisArt, ereignisse } from './lauf/index.js';
 import { LaufListe, Register } from './documents.js';
 import { schwaerzen } from './persona/redaktion.js';
+import { tx } from './i18n.js';
 
 const CTX = KONTEXT;
 
@@ -44,12 +45,12 @@ function assistentenText(entry) {
 function eintragZeile(entry) {
   const k = entry?.kind;
   const d = entry?.data ?? {};
-  if (k === 'fyos.eingang') return { typ: 'eingang', text: `${d.quelle ?? 'hub'}${d.klasse === 'max' ? ' (Besitzer)' : ''}: ${kurz(d.text, 240)}` };
+  if (k === 'fyos.eingang') return { typ: 'eingang', text: `${d.quelle ?? 'hub'}${d.klasse === 'max' ? tx(' (Besitzer)', ' (owner)') : ''}: ${kurz(d.text, 240)}` };
   if (k === 'fyos.mensch') return { typ: 'mensch', text: kurz(d.text, 240) };
-  if (k === 'fyos.freigabe') return { typ: 'freigabe', text: `wartet auf Freigabe: ${kurz(d.aktion, 200)}` };
-  if (k === 'fyos.freigabe-entscheidung') return { typ: 'freigabe', text: `Freigabe ${d.entscheidung ?? ''} (${d.id ?? ''})` };
-  if (k === 'fyos.befehl') return { typ: 'befehl', text: `/${d.name ?? ''}${d.ok === false ? ' (abgelehnt)' : ''}: ${kurz(String(d.text ?? '').split('\n')[0], 160)}` };
-  if (k === 'fyos.lauf.auftrag') return { typ: 'lauf', text: `Lauf ${d.lauf ?? ''}: ${kurz(d.titel, 160)}` };
+  if (k === 'fyos.freigabe') return { typ: 'freigabe', text: `${tx('wartet auf Freigabe', 'waiting for approval')}: ${kurz(d.aktion, 200)}` };
+  if (k === 'fyos.freigabe-entscheidung') return { typ: 'freigabe', text: `${tx('Freigabe', 'Approval')} ${tx(d.entscheidung ?? '', { erteilt: 'granted', abgelehnt: 'denied' }[d.entscheidung] ?? d.entscheidung ?? '')} (${d.id ?? ''})` };
+  if (k === 'fyos.befehl') return { typ: 'befehl', text: `/${d.name ?? ''}${d.ok === false ? tx(' (abgelehnt)', ' (rejected)') : ''}: ${kurz(String(d.text ?? '').split('\n')[0], 160)}` };
+  if (k === 'fyos.lauf.auftrag') return { typ: 'lauf', text: `${tx('Lauf', 'Run')} ${d.lauf ?? ''}: ${kurz(d.titel, 160)}` };
   return null;
 }
 
@@ -63,19 +64,19 @@ export function zeileAus(e) {
       return text ? { typ: 'sagt', text } : null;
     }
     case EREIGNIS.WERKZEUG_START:
-      return { typ: 'werkzeug', wz: e.toolName, text: `${e.toolName ?? 'Werkzeug'} ${argKurz(e.args)}`.trim() };
+      return { typ: 'werkzeug', wz: e.toolName, text: `${e.toolName ?? tx('Werkzeug', 'Tool')} ${argKurz(e.args)}`.trim() };
     case EREIGNIS.WERKZEUG_ENDE: {
       const fehler = e.entry?.data?.isError || e.entry?.model?.some?.((m) => m?.isError);
-      return fehler ? { typ: 'fehler', wz: e.toolName, text: `${e.toolName ?? 'Werkzeug'} fehlgeschlagen` } : null;
+      return fehler ? { typ: 'fehler', wz: e.toolName, text: `${e.toolName ?? tx('Werkzeug', 'Tool')} ${tx('fehlgeschlagen', 'failed')}` } : null;
     }
     case EREIGNIS.EINTRAG:
       return eintragZeile(e.entry);
     case EREIGNIS.ZUG_ENDE:
-      return { typ: 'fertig', text: 'Zug fertig' };
+      return { typ: 'fertig', text: tx('Zug fertig', 'Turn done') };
     case EREIGNIS.AUFGABE_FEHLGESCHLAGEN:
-      return { typ: 'fehler', text: kurz(e.message || 'Aufgabe fehlgeschlagen', 300) };
+      return { typ: 'fehler', text: kurz(e.message || tx('Aufgabe fehlgeschlagen', 'Task failed'), 300) };
     case EREIGNIS.VERDICHTEN_START:
-      return { typ: 'schritt', text: 'verdichtet den Verlauf' };
+      return { typ: 'schritt', text: tx('verdichtet den Verlauf', 'compacting the history') };
     default:
       return null;
   }
@@ -134,7 +135,7 @@ export async function oeffneWirkenStrom(harness) {
   const laeufeAnwenden = (liste) => {
     for (const e of Object.values(liste?.eintraege ?? {})) {
       if (!e.kindId) continue;
-      titel.set(e.kindId, { titel: `Lauf ${e.id}: ${e.titel ?? ''}`.trim(), art: 'lauf' });
+      titel.set(e.kindId, { titel: `${tx('Lauf', 'Run')} ${e.id}: ${e.titel ?? ''}`.trim(), art: 'lauf' });
       void haengen(e.kindId);
     }
   };

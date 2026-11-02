@@ -1,123 +1,129 @@
-# Änderungen
+# Changelog
 
-Alle nennenswerten Änderungen an fyos-agent stehen hier. Das Format folgt
-[Keep a Changelog](https://keepachangelog.com/de/1.1.0/), die Versionen folgen
-[Semantic Versioning](https://semver.org/lang/de/). Die Zahlen in Klammern sind die Nummern der Pull Requests.
+All notable changes to fyos-agent are listed here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
+[Semantic Versioning](https://semver.org/). Numbers in parentheses are pull request numbers.
 
-fyos-agent ist der Agent der Distribution FYOS: der Runner auf pi-durable (`runner/`). Das Repo trägt dieselbe
-Versionsnummer wie das Schwester-Repo `fyos-os` und wird mit demselben Tag veröffentlicht. Der Installer von `fyos-os`
-zieht das Bild `runner` mit diesem Tag.
+fyos-agent is the agent of the FYOS distribution: the runner on pi-durable (`runner/`). The repo carries the same version
+number as its sister repo `fyos-os` and is released with the same tag. The `fyos-os` installer pulls the `runner` image
+with that tag.
+
+## [0.3.0] – 2026-11-02
+
+### Added
+
+- **English by default.** The runner speaks English to people and in its own prompt sections when `pi_durable.sprache`
+  is `en` (environment `FYOS_RUNNER_SPRACHE`). The image, the local mode and the example configuration set `en`; German
+  stays available with `de`. Covered: web interface, API errors, approval notices (Matrix, ntfy), terminal client, the
+  runner's role and tool rules, descriptions of its own tools. Tool names are unchanged.
+- **Approvals follow the configured owner.** Who grants an approval comes from `itsm.besitzer` (distribution: `besitzer`)
+  instead of a fixed name, so approvals given in the `fyos-os` ticket app take effect.
+
+### Changed
+
+- `runner/README.md` is now English; the German version is `runner/README.de.md`.
+- This changelog and the top-level README are English.
 
 ## [0.2.1] – 2026-11-02
 
-### Entfernt
+### Removed
 
-- **OpenClaw ist vollständig raus.** Der OpenClaw-Mod (`openclaw/`, `plugins/`, `workspace/`, `fyos_agent/`, `config/`,
-  `vertrag/`, `skills/`, `fyos.example.yaml`) und das Bild `fyos-agent/openclaw` entfallen. Der Runner ersetzt ihn
-  vollständig; es wird nur noch das Bild `fyos-agent/runner` gebaut.
+- **OpenClaw is gone entirely.** The OpenClaw mod (`openclaw/`, `plugins/`, `workspace/`, `fyos_agent/`, `config/`,
+  `vertrag/`, `skills/`, `fyos.example.yaml`) and the `fyos-agent/openclaw` image are removed. The runner replaces it
+  completely; only the `fyos-agent/runner` image is built.
 
-### Umstieg
+### Migration
 
-Wer noch OpenClaw aus 0.2.0 oder früher nutzt, folgt dem Umstieg im Abschnitt 0.2.0. Chat-Kanäle über OpenClaw (Telegram,
-WhatsApp) gibt es nicht mehr; Freigabe-Meldungen kann der Runner selbst über Matrix oder ntfy schicken
+If you still use OpenClaw from 0.2.0 or earlier, follow the migration in the 0.2.0 section. Chat channels through
+OpenClaw (Telegram, WhatsApp) no longer exist; the runner can send approval notices itself via Matrix or ntfy
 (`pi_durable.freigabe_meldung.kanaele`).
 
 ## [0.2.0] – 2026-11-02
 
-### Neu
+### Added
 
-- **Der Runner ist der Agent.** Unter `runner/` liegt der dauerhafte FYOS-Runner auf pi-durable (Node ≥ 22.19, Paket
-  `fyos-agent`). Gespräche, Werkzeugaufrufe und Freigaben stehen in einer SQLite-Datei und überleben Neustarts. Zwei
-  Betriebsarten: lokal (Desktop, ohne Hub und ssh) und voll (Server, mit Hub-Werkzeugen, Takt, Arbeitsschleife,
-  Gedächtnis). Anleitung: `runner/README.md`, Vorlage: `runner/beispiele/agent-runner.beispiel.json`.
-- **Lokaler Runner für die FYOS-Hülle.** `runner/lokal/` ist das Startprogramm nach dem Vertrag der Hülle,
-  `runner/scripts/runner-lokal-buendel.mjs` baut ein Bündel mit eigenem Node.
-- **Terminal-Client** `fyos-agent` (`runner/scripts/fyos-agent.mjs`).
+- **The runner is the agent.** `runner/` holds the durable FYOS runner on pi-durable (Node ≥ 22.19, package
+  `fyos-agent`). Conversations, tool calls and approvals live in one SQLite file and survive restarts. Two modes: local
+  (desktop, without hub and ssh) and full (server, with hub tools, schedule, work loop, memory). Guide:
+  `runner/README.md`, template: `runner/beispiele/agent-runner.beispiel.json`.
+- **Local runner for the FYOS shell.** `runner/lokal/` is the start program following the shell's contract;
+  `runner/scripts/runner-lokal-buendel.mjs` builds a bundle with its own Node.
+- **Terminal client** `fyos-agent` (`runner/scripts/fyos-agent.mjs`).
 
-### Geändert
+### Changed
 
-- Rechner, auf die der Agent per ssh darf, stehen nur noch in der Konfiguration (`pi_durable.nodes`); der Code bringt
-  keine mit.
+- Machines the agent may reach over ssh are listed only in the configuration (`pi_durable.nodes`); the code ships none.
 
-### Veraltet
+### Deprecated
 
-- **OpenClaw-Mod** (`openclaw/`, `plugins/`, `workspace/`, `fyos_agent/`). Bleibt in 0.2.x lauffähig und wird nicht
-  weiterentwickelt. Entfernung frühestens in 0.3.0.
+- **OpenClaw mod** (`openclaw/`, `plugins/`, `workspace/`, `fyos_agent/`). Still works in 0.2.x and is no longer
+  developed. Removed in 0.2.1 at the earliest.
 
-### Umstieg von OpenClaw
+### Migrating from OpenClaw
 
-1. Runner installieren: `cd runner && npm ci --omit=dev`.
-2. Aus `fyos.yaml` übernehmen: Modelladresse und -name nach `pi_durable.model` (`baseUrl`, `default`), Hub-Adresse nach
-   `hub`, das Hub-Token als Datei nach `hub_token_datei`.
-3. Ein Token für die Oberfläche anlegen (`openssl rand -hex 32 > ~/.fyos/runner/token`) und
-   `node src/index.js --config agent-runner.json` starten.
-4. Die Gesprächsverläufe von OpenClaw werden nicht übernommen; das Gedächtnis im Hub bleibt.
-5. Den OpenClaw-Container erst stoppen, wenn der Runner im Hub als Agent gemeldet ist.
+1. Install the runner: `cd runner && npm ci --omit=dev`.
+2. Carry over from `fyos.yaml`: model address and name to `pi_durable.model` (`baseUrl`, `default`), the hub address to
+   `hub`, the hub token as a file to `hub_token_datei`.
+3. Create a token for the interface (`openssl rand -hex 32 > ~/.fyos/runner/token`) and start
+   `node src/index.js --config agent-runner.json`.
+4. OpenClaw conversation histories are not carried over; the memory in the hub stays.
+5. Stop the OpenClaw container only once the runner shows up in the hub as an agent.
 
 ## [0.1.3] – 2026-10-22
 
-Keine inhaltlichen Änderungen am Agenten. Die Nummer folgt der FYOS-Version, weil der Installer das Bild `openclaw`
-mit dem Tag seiner eigenen Version zieht.
+No changes to the agent itself. The number follows the FYOS version because the installer pulls the `openclaw` image
+with the tag of its own version.
 
 ## [0.1.2] – 2026-10-22
 
-Keine inhaltlichen Änderungen am Agenten. Die Nummer folgt der FYOS-Version, weil der Installer das Bild `openclaw`
-mit dem Tag seiner eigenen Version zieht.
+No changes to the agent itself. The number follows the FYOS version because the installer pulls the `openclaw` image
+with the tag of its own version.
 
 ## [0.1.1] – 2026-10-11
 
-Vorbereitet: Der Tag `v0.1.1` und die Veröffentlichung folgen nach dem Ablauf in `RELEASE.md` im Repo `fyos-os`.
+### Added
 
-### Neu
+- **WhatsApp as a third channel** next to Matrix and Telegram. Turn it on in `fyos.yaml` under `kanaele`, build the image
+  with `--build-arg FYOS_KANAELE=whatsapp` (or `matrix,whatsapp`) and pair the account once by QR code. Only the owner's
+  direct messages count. Approval requests also arrive via WhatsApp, and a text reply decides them. With
+  `whatsapp.eigene_nummer` the agent runs on your own number (notes to yourself); a separate number for the agent is
+  better (#5).
+- **Urgent notice to the owner.** The bridge offers `fyos.kanal.mitteilen`: the agent sends something important over the
+  first ready channel (Telegram, WhatsApp or Matrix). The channels' state (only on or off, never the address) is part of
+  the bridge status (#6).
+- **Bridge 0.2.0** (`fyos-bruecke`): the hub can wake the agent (`fyos.wecken`) and write a message into a ticket's
+  session (`fyos.vorgang.senden`). Each ticket has its own session; events carry the ticket number. Plus read-only
+  queries for memory search, sessions, heartbeat, progress card, agents and tools. The agent's id is in the configuration
+  (`agentId`) or in `FYOS_AGENT` (#7).
+- **Memory with vector search.** The agent uses the same embedding service as the hub (`FYOS_EMBED_URL`). Without one it
+  searches the text and says so. "Active memory" (a sub-agent searches before every answer) can be switched on and is off
+  by default (#9).
+- **Skill `zusagen`.** What the owner asks for later ("remind me", "if X, then Y") becomes a ticket with its own trigger
+  (time, event or follow-up). For multi-step work the agent keeps a progress card per ticket (#10).
+- **Mouth and ear.** Speech output and speech input each go through an OpenAI-compatible service. Both are optional and
+  stay off without an address (`mund` and `ohr` in `fyos.yaml`, keys only in the environment) (#11).
 
-- **WhatsApp als dritter Kanal** neben Matrix und Telegram. Du schaltest ihn in `fyos.yaml` unter `kanaele` ein, baust
-  das Bild mit `--build-arg FYOS_KANAELE=whatsapp` (oder `matrix,whatsapp`) und koppelst das Konto einmal per QR-Code.
-  Es gelten nur Direktnachrichten des Besitzers. Freigabe-Anfragen kommen auch per WhatsApp, die Antwort als Text
-  entscheidet sie. Mit
-  `whatsapp.eigene_nummer` läuft der Agent auf der eigenen Nummer (Notizen an sich selbst), besser ist eine eigene
-  Nummer für den Agenten (#5).
-- **Dringende Mitteilung an den Besitzer.** Die Brücke bietet `fyos.kanal.mitteilen`: Der Agent schickt etwas Wichtiges
-  über den ersten bereiten Kanal (Telegram, WhatsApp oder Matrix). Der Stand der Kanäle (nur an oder aus, nie die
-  Adresse) steht im Status der Brücke (#6).
-- **Brücke 0.2.0** (`fyos-bruecke`): Der Hub kann den Agenten wecken (`fyos.wecken`) und eine Nachricht in die
-  Sitzung eines Vorgangs schreiben (`fyos.vorgang.senden`). Jeder Vorgang hat seine eigene Sitzung, Ereignisse tragen die
-  Vorgangsnummer mit. Dazu kommen lesende Abfragen für Gedächtnissuche, Sitzungen, Herzschlag, Fortschrittskarte,
-  Agenten und Werkzeuge. Die Kennung des Agenten steht in der Konfiguration (`agentId`) oder in `FYOS_AGENT` (#7).
-- **Gedächtnis mit Vektorsuche.** Der Agent nutzt denselben Embedding-Dienst wie der Hub (`FYOS_EMBED_URL`). Ohne Dienst
-  sucht er im Text und sagt das ausdrücklich. Das „aktive Gedächtnis“ (ein Teilagent sucht vor jeder Antwort) ist
-  schaltbar und standardmäßig aus (#9).
-- **Skill `zusagen`.** Was der Besitzer für später aufträgt („erinnere mich“, „wenn X, dann Y“), wird ein Vorgang mit
-  eigenem Auslöser (Zeit, Ereignis oder Wiedervorlage). Dazu pflegt der Agent bei mehrstufiger Arbeit eine
-  Fortschrittskarte je Vorgang (#10).
-- **Mund und Ohr.** Sprachausgabe und Spracheingabe laufen über je einen OpenAI-kompatiblen Dienst. Beides ist optional;
-  ohne Adresse bleibt es aus (`mund` und `ohr` in `fyos.yaml`, Schlüssel nur in der Umgebung) (#11).
+### Changed
 
-### Geändert
-
-- Vorgangsnummern in der Brücke erkennen neben `INC-1234` auch die Kurzkennung (`WB-1a2b3c4d`) (#8).
-- Die Gitea-CI läuft täglich nach Zeitplan gegen die neuesten Pakete, auch ohne neuen Commit; je Commit gibt es genau
-  einen Lauf (Zweige über den Pull Request, `main` über den Push) (#3, #4).
-
-### Behoben
-
-- Keine eigenständigen Fehlerkorrekturen in dieser Version.
+- Ticket numbers in the bridge accept the short id (`WB-1a2b3c4d`) as well as `INC-1234` (#8).
+- The Gitea CI runs daily on a schedule against the newest packages, even without a new commit; each commit gets exactly
+  one run (branches through the pull request, `main` through the push) (#3, #4).
 
 ## [0.1.0] – 2026-10-10
 
-Erste Veröffentlichung.
+First release.
 
-### Neu
+### Added
 
-- OpenClaw als Agent mit Verhaltens-Plugins: Freigaben im Chat, Kontext-Edit, Meldebudget, Priorität, Tempo-Weiche und
-  die Ersteinrichtung als Gespräch, in der der Agent den Besitzer beim ersten Mal kennenlernt.
-- Matrix und Telegram als Chat-Kanäle (Vorgabe aus, nur Direktnachrichten des Besitzers).
-- Die Brücke `fyos-bruecke` koppelt den Agenten an den FYOS-Hub (Workboard, Skills, Cron, Nutzung und Ereignisse ohne
-  Inhalte).
-- Vorlagen und Renderer, die aus `fyos.yaml` die Konfiguration, den Arbeitsordner und die Verträge erzeugen.
-- Bild `openclaw` mit versionsgebundenen Korrekturen, Zusatz-Plugins ohne Fork und Werkzeugen für das Veröffentlichen
-  (`tools/sauber.py`).
+- OpenClaw as the agent with behaviour plugins: approvals in chat, context edit, notice budget, priority, speed switch and
+  first-time setup as a conversation in which the agent gets to know its owner.
+- Matrix and Telegram as chat channels (off by default, only the owner's direct messages).
+- The bridge `fyos-bruecke` couples the agent to the FYOS hub (workboard, skills, cron, usage and events without
+  content).
+- Templates and a renderer that produce the configuration, the workspace and the contracts from `fyos.yaml`.
+- The `openclaw` image with version-bound fixes, extra plugins without a fork, and publishing tools (`tools/sauber.py`).
 
-### Geändert
+### Changed
 
-- Lizenz Apache-2.0 und englische README (#1).
-- GitHub-Workflows für Tests und Bilder; die NOTICE nennt OpenClaw (#2).
+- Apache-2.0 license and an English README (#1).
+- GitHub workflows for tests and images; the NOTICE names OpenClaw (#2).

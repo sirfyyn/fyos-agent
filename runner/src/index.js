@@ -13,6 +13,7 @@
  * Zwei Leser auf demselben Strom würden jedes Ereignis doppelt ausführen.
  */
 import { bindungPruefen, konfigurationLaden, oeffentlicheSicht } from './config.js';
+import { spracheSetzen } from './i18n.js';
 import { Fehlerspeicher, Zugmessung, buildInfo, erstelleVerwaltung } from './verwaltung.js';
 import { Runner } from './runner.js';
 import { Egress } from './egress.js';
@@ -48,6 +49,8 @@ async function main() {
 
   const cfg = konfigurationLaden();
   const pd = cfg.pi_durable;
+  // Language of human-facing texts and of the runner's own prompt sections (default German, src/i18n.js).
+  spracheSetzen(pd.sprache);
 
   const tokenQuelle = tokenSicherstellen(cfg);
   const bindung = bindungPruefen(pd);

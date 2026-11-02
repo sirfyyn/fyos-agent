@@ -1,8 +1,8 @@
-# Prüfen bei jedem Push, Bild bauen auf main.
-# Repo-Variablen: FYOS_RUNNER, FYOS_REGISTRY, optional FYOS_REGISTRY_HOSTS.
-# Anmeldung an der Registry: Secrets REGISTRY_USER/REGISTRY_TOKEN (Token mit write:package; Gitea gibt dem
-# Laufzeit-Token GITEA_TOKEN keine Paketrechte). Fehlen sie, versucht der Lauf das Laufzeit-Token (packages: write).
-# Der Agent ist der Runner (runner/).
+# Checks on every push, builds the image on main.
+# Repo variables: FYOS_RUNNER, FYOS_REGISTRY, optional FYOS_REGISTRY_HOSTS.
+# Registry login: secrets REGISTRY_USER/REGISTRY_TOKEN (token with write:package; Gitea gives the runtime token
+# GITEA_TOKEN no package rights). Without them the run tries the runtime token (packages: write).
+# The agent is the runner (runner/).
 name: ci
 
 on:
@@ -10,13 +10,12 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-  # Laufend getestet (Entscheidungsbuch Nr. 144): täglich gegen die neuesten Pakete aus dem
-  # Index, auch ohne Commit. Rot meldet die Erkunden-Schleife als Vorgang (Bereich dist).
+  # Tested continuously: daily against the newest packages from the index, even without a commit.
   schedule:
     - cron: "11 5 * * *"
 
-# Je Commit genau ein Lauf: Zweige prüft der PR-Lauf, main der Push-Lauf. Prüfen Push und PR denselben Commit,
-# bricht Gitea den wartenden zweiten Lauf ab, und der Abbruch zählt als Fehlschlag.
+# Exactly one run per commit: branches through the PR run, main through the push run. If push and PR check the same
+# commit, Gitea cancels the waiting second run, and the cancellation counts as a failure.
 concurrency:
   group: ${{ gitea.workflow }}-${{ gitea.ref }}
   cancel-in-progress: false
@@ -26,7 +25,7 @@ jobs:
     runs-on: ${{ vars.FYOS_RUNNER }}
     steps:
       - uses: actions/checkout@v4
-      - name: Sauberkeit
+      - name: Cleanliness
         run: python3 tools/sauber.py .
       - name: Runner-Tests
         working-directory: runner
@@ -46,7 +45,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
-      - name: Anmelden
+      - name: Log in
         run: |
           host="${FYOS_REGISTRY%%/*}"
           printf '%s' "$REGISTRY_TOKEN" | docker login "$host" -u "$REGISTRY_USER" --password-stdin
@@ -65,7 +64,7 @@ jobs:
           tags: |
             ${{ vars.FYOS_REGISTRY }}/fyos-agent/runner:main
             ${{ vars.FYOS_REGISTRY }}/fyos-agent/runner:${{ gitea.sha }}
-      - name: Runner im Bild prüfen
+      - name: Check the runner in the image
         run: |
           bild="${{ vars.FYOS_REGISTRY }}/fyos-agent/runner:${{ gitea.sha }}"
           docker run --rm "$bild" node -e "import('/opt/fyos-agent/src/config.js').then(m => { const c = m.konfigurationLaden({}, { FYOS_RUNNER_CONTAINER: '1', FYOS_RUNNER_HOST: '0.0.0.0', FYOS_RUNNER_TOKEN: 'x'.repeat(32) }); if (m.bindungPruefen(c.pi_durable).fehler) process.exit(1); console.log('ok', c.pi_durable.port) })"
