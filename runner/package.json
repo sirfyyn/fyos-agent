@@ -1,6 +1,6 @@
 {
   "name": "fyos-agent",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "type": "module",
   "description": "FYOS agent: a durable pi-durable runner with hub tools, approvals, memory and a local mode.",

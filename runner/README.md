@@ -48,7 +48,7 @@ Vorlage schaltet ihn mit `"takt": {"an": false}` aus. Eigene Einträge stehen un
 | `FYOS_RUNNER_CONTAINER` | `1` im Bild: Bindung an alle Adressen erlaubt, nur mit Token |
 | `FYOS_RUNNER_LOKAL` | `1` schaltet den lokalen Modus ein |
 | `FYOS_LOKAL_MODELL_URL`, `FYOS_LOKAL_MODELL_ID`, `FYOS_LOKAL_MODELL_KEY(_DATEI)` | Modell im lokalen Modus |
-| `FYOS_MODELL_BASIS_URL`, `FYOS_MODELL_NAME`, `FYOS_MODELL_SCHLUESSEL` | Modell im vollen Modus (wie beim OpenClaw-Agenten) |
+| `FYOS_MODELL_BASIS_URL`, `FYOS_MODELL_NAME`, `FYOS_MODELL_SCHLUESSEL` | Modell im vollen Modus (wie im Installer) |
 | `FYOS_HUB_AGENT_TOKEN` | Token für den Hub (sonst `hub_token_datei`) |
 | `FYOS_PROVIDER_KETTE` | Reihenfolge der Modelle, wenn eines ausfällt |
 

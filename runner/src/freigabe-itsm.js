@@ -1,7 +1,7 @@
 /**
  * freigabe-itsm.js — ITSM-Freigaben erreichen Besitzer auf Matrix, mit denselben Chips (Besitzer 26.10.2026, „ja“ zu „einen Weg für alles“).
  *
- * Anlass: Der ITSM-Fanout zielte auf OpenClaw (stillgelegt, „Connection refused“), eine Freigabe am ITSM-Vorgang kam nie bei Besitzer an.
+ * Anlass: Der ITSM-Fanout zielte auf den früheren Agenten (stillgelegt, „Connection refused“), eine Freigabe am ITSM-Vorgang kam nie bei Besitzer an.
  * Die Wache `freigabe-meldung.js` kennt nur die Freigaben des Runners (Dokument `Freigaben`). Dieses Modul speist die offenen
  * ITSM-Freigaben (Vorgang im Status `waiting_approval`, Eintrag `art: freigabe` in `leitstand.braucht_dich`) in dieselbe Wache ein
  * und beantwortet sie über `leitstand.freigabe` — derselbe Weg wie die FYOS-App, Akteur Besitzer.

@@ -353,7 +353,7 @@ export function konfigurationLaden(quelle = configPfad(), env = process.env) {
   };
   if (e.FYOS_HAUSMODELL_URL) pd.model.baseUrl = e.FYOS_HAUSMODELL_URL;
   if (e.FYOS_HAUSMODELL_KEY) pd.model.apiKey = e.FYOS_HAUSMODELL_KEY;
-  // Dieselben Namen wie der OpenClaw-Agent und der Installer (Release 0.2): jedes OpenAI-kompatible Modell.
+  // Dieselben Namen wie im Installer (Release 0.2): jedes OpenAI-kompatible Modell.
   if (e.FYOS_MODELL_BASIS_URL) pd.model.baseUrl = e.FYOS_MODELL_BASIS_URL;
   if (e.FYOS_MODELL_SCHLUESSEL) pd.model.apiKey = e.FYOS_MODELL_SCHLUESSEL;
   if (e.FYOS_MODELL_NAME) pd.model = { ...pd.model, default: e.FYOS_MODELL_NAME, max: e.FYOS_MODELL_NAME };

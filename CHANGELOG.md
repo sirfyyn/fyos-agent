@@ -4,10 +4,23 @@ Alle nennenswerten Änderungen an fyos-agent stehen hier. Das Format folgt
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), die Versionen folgen
 [Semantic Versioning](https://semver.org/lang/de/). Die Zahlen in Klammern sind die Nummern der Pull Requests.
 
-fyos-agent ist der Agent der Distribution FYOS: ab 0.2.0 der Runner auf pi-durable (`runner/`), davor OpenClaw mit Verhaltens-Plugins, Vorlagen und einem Vertrag. Das Repo
-trägt dieselbe Versionsnummer wie das Schwester-Repo `fyos-os` und wird mit demselben Tag veröffentlicht. Der Installer
-von `fyos-os` zieht die Bilder `runner` und `openclaw` mit diesem Tag. Das Plugin `fyos-bruecke` hat zusätzlich eine eigene Nummer
-(0.2.0 in dieser Version).
+fyos-agent ist der Agent der Distribution FYOS: der Runner auf pi-durable (`runner/`). Das Repo trägt dieselbe
+Versionsnummer wie das Schwester-Repo `fyos-os` und wird mit demselben Tag veröffentlicht. Der Installer von `fyos-os`
+zieht das Bild `runner` mit diesem Tag.
+
+## [0.2.1] – 2026-11-02
+
+### Entfernt
+
+- **OpenClaw ist vollständig raus.** Der OpenClaw-Mod (`openclaw/`, `plugins/`, `workspace/`, `fyos_agent/`, `config/`,
+  `vertrag/`, `skills/`, `fyos.example.yaml`) und das Bild `fyos-agent/openclaw` entfallen. Der Runner ersetzt ihn
+  vollständig; es wird nur noch das Bild `fyos-agent/runner` gebaut.
+
+### Umstieg
+
+Wer noch OpenClaw aus 0.2.0 oder früher nutzt, folgt dem Umstieg im Abschnitt 0.2.0. Chat-Kanäle über OpenClaw (Telegram,
+WhatsApp) gibt es nicht mehr; Freigabe-Meldungen kann der Runner selbst über Matrix oder ntfy schicken
+(`pi_durable.freigabe_meldung.kanaele`).
 
 ## [0.2.0] – 2026-11-02
 

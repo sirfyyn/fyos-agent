@@ -208,7 +208,7 @@ test('Container: Wildcard nur mit FYOS_RUNNER_CONTAINER und Token, sonst weiter 
   assert.equal(cfg.pi_durable.container, true);
 });
 
-test('Modell aus FYOS_MODELL_* wie beim OpenClaw-Agenten und im Installer', () => {
+test('Modell aus FYOS_MODELL_* wie im Installer', () => {
   const cfg = konfigurationLaden({}, { FYOS_MODELL_BASIS_URL: 'http://modell:8080/v1/', FYOS_MODELL_NAME: 'mein-modell', FYOS_MODELL_SCHLUESSEL: 'geheim' });
   assert.equal(cfg.pi_durable.model.baseUrl, 'http://modell:8080/v1');
   assert.equal(cfg.pi_durable.model.default, 'mein-modell');

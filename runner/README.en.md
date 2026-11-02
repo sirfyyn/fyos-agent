@@ -48,7 +48,7 @@ template turns it off with `"takt": {"an": false}`. Own entries go under `takt.e
 | `FYOS_RUNNER_CONTAINER` | `1` in the image: binding to all addresses allowed, only with a token |
 | `FYOS_RUNNER_LOKAL` | `1` turns on local mode |
 | `FYOS_LOKAL_MODELL_URL`, `FYOS_LOKAL_MODELL_ID`, `FYOS_LOKAL_MODELL_KEY(_DATEI)` | Model in local mode |
-| `FYOS_MODELL_BASIS_URL`, `FYOS_MODELL_NAME`, `FYOS_MODELL_SCHLUESSEL` | Model in full mode (same as the OpenClaw agent) |
+| `FYOS_MODELL_BASIS_URL`, `FYOS_MODELL_NAME`, `FYOS_MODELL_SCHLUESSEL` | Model in full mode (same as the installer) |
 | `FYOS_HUB_AGENT_TOKEN` | Token for the hub (otherwise `hub_token_datei`) |
 | `FYOS_PROVIDER_KETTE` | Order of models when one fails |
 

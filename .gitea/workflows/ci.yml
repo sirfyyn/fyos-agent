@@ -2,6 +2,7 @@
 # Repo-Variablen: FYOS_RUNNER, FYOS_REGISTRY, optional FYOS_REGISTRY_HOSTS.
 # Anmeldung an der Registry: Secrets REGISTRY_USER/REGISTRY_TOKEN (Token mit write:package; Gitea gibt dem
 # Laufzeit-Token GITEA_TOKEN keine Paketrechte). Fehlen sie, versucht der Lauf das Laufzeit-Token (packages: write).
+# Der Agent ist der Runner (runner/).
 name: ci
 
 on:
@@ -27,13 +28,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Sauberkeit
         run: python3 tools/sauber.py .
-      - name: Render-Tests
+      - name: Runner-Tests
+        working-directory: runner
         run: |
-          python3 -m venv /tmp/venv
-          /tmp/venv/bin/pip install -q pytest pyyaml
-          /tmp/venv/bin/python -m pytest tests -q
-      - name: Plugin-Tests
-        run: node --test "plugins/**/*.test.mjs"
+          npm ci --no-audit --no-fund
+          npm test
 
   bauen:
     needs: pruefen
@@ -57,16 +56,16 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GITEA_TOKEN }}
       - uses: docker/build-push-action@v5
         with:
-          context: .
-          file: openclaw/Dockerfile
+          context: runner
+          file: runner/Dockerfile
           add-hosts: ${{ vars.FYOS_REGISTRY_HOSTS }}
           push: true
           provenance: false
           sbom: false
           tags: |
-            ${{ vars.FYOS_REGISTRY }}/fyos-agent/openclaw:main
-            ${{ vars.FYOS_REGISTRY }}/fyos-agent/openclaw:${{ gitea.sha }}
-      - name: Upstream-Einstieg im Bild prüfen
+            ${{ vars.FYOS_REGISTRY }}/fyos-agent/runner:main
+            ${{ vars.FYOS_REGISTRY }}/fyos-agent/runner:${{ gitea.sha }}
+      - name: Runner im Bild prüfen
         run: |
-          bild="${{ vars.FYOS_REGISTRY }}/fyos-agent/openclaw:${{ gitea.sha }}"
-          docker run --rm --entrypoint sh "$bild" -c 'command -v tini && command -v openclaw && ls /app | head -50 && python3 -c "import yaml"'
+          bild="${{ vars.FYOS_REGISTRY }}/fyos-agent/runner:${{ gitea.sha }}"
+          docker run --rm "$bild" node -e "import('/opt/fyos-agent/src/config.js').then(m => { const c = m.konfigurationLaden({}, { FYOS_RUNNER_CONTAINER: '1', FYOS_RUNNER_HOST: '0.0.0.0', FYOS_RUNNER_TOKEN: 'x'.repeat(32) }); if (m.bindungPruefen(c.pi_durable).fehler) process.exit(1); console.log('ok', c.pi_durable.port) })"
