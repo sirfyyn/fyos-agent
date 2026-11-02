@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#12161c" />
+    <meta name="description" content="FYOS Agenten-Lauf: dauerhafte Gespräche, Aufgaben und Freigaben." />
+    <title>FYOS · Agenten-Lauf</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="wirken.css" />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">FY</div>
+          <div class="brand-text">
+            <strong>FYOS</strong>
+            <span id="brand-geraet">Agenten-Lauf</span>
+          </div>
+          <button class="icon-btn only-mobile" id="sidebar-zu" title="Seitenleiste schließen" aria-label="Seitenleiste schließen">×</button>
+        </div>
+
+        <div class="verbindung" id="verbindung">
+          <span class="punkt" id="verbindung-punkt"></span>
+          <span id="verbindung-text">verbinde …</span>
+          <span class="mini" id="verbindung-hub"></span>
+        </div>
+
+        <div class="sidebar-aktionen">
+          <button class="primary" id="neu-gespraech">＋ Neuer Agent</button>
+        </div>
+
+        <div class="sidebar-titel">
+          <span>Gespräche</span>
+          <span class="zaehler" id="gespraech-zaehler">0</span>
+        </div>
+        <nav class="gespraechsliste" id="gespraechsliste" aria-label="Gespräche"></nav>
+
+        <div class="sidebar-titel freigaben-titel">
+          <span>Freigaben</span>
+          <span class="zaehler warn" id="freigabe-zaehler">0</span>
+        </div>
+        <div class="freigaben-kurz" id="freigaben-kurz"></div>
+
+        <div class="sidebar-fuss">
+          <button class="ghost" id="einstellungen-knopf">Erweitern</button>
+          <span class="mini" id="version">v0.1</span>
+        </div>
+      </aside>
+
+      <div class="schleier" id="schleier"></div>
+
+      <main class="haupt">
+        <header class="top">
+          <button class="icon-btn only-mobile" id="sidebar-auf" title="Seitenleiste öffnen" aria-label="Seitenleiste öffnen">☰</button>
+          <div class="titel-block">
+            <h1 id="gespraech-titel">FYOS Agent</h1>
+            <div class="untertitel" id="gespraech-untertitel">dauerhaft · mehrere Clients · Freigaben</div>
+          </div>
+          <div class="top-status" id="top-status"></div>
+          <div class="top-aktionen">
+            <button class="ghost live-schalter" id="aktion-live" title="Strom der autonomen Arbeit ein-/ausblenden (/live)" aria-pressed="true">Live</button>
+            <button class="ghost" id="aktion-zweig" title="Letzten Stand abzweigen">Abzweigen</button>
+            <button class="ghost" id="aktion-verdichten" title="Verlauf verdichten">Verdichten</button>
+            <button class="ghost gefahr" id="aktion-abbrechen" title="Laufenden Zug abbrechen" hidden>Abbrechen</button>
+          </div>
+        </header>
+
+        <nav class="tabs" id="tabs" aria-label="Bereiche">
+          <button data-tab="chat" class="aktiv">Gespräch</button>
+          <button data-tab="zustand">Zustand <span class="tab-zaehler" id="zustand-zaehler"></span></button>
+          <button data-tab="aufgaben">Aufgaben <span class="tab-zaehler" id="aufgaben-zaehler"></span></button>
+          <button data-tab="werkzeuge">Werkzeuge</button>
+          <button data-tab="erweitern">Erweitern</button>
+        </nav>
+
+        <section class="inhalt" id="inhalt-chat">
+          <div class="freigabe-banner" id="freigabe-banner" hidden></div>
+          <section class="wirken" id="wirken" aria-label="Autonome Arbeit" hidden>
+            <header class="wirken-kopf">
+              <span class="punkt" aria-hidden="true"></span>
+              <strong>Live · was der Agent gerade selbst tut</strong>
+              <span class="mini" id="wirken-zaehler"></span>
+              <button class="ghost" id="wirken-aus" title="Ausblenden (/live)">ausblenden</button>
+            </header>
+            <ol class="wirken-liste" id="wirken-liste"></ol>
+          </section>
+          <div class="chat" id="chat" aria-live="polite">
+            <div class="leer" id="chat-leer">
+              <div class="leer-marke">FY</div>
+              <h2>Ein Gespräch, das bleibt.</h2>
+              <p>Schreib Persona. Der Lauf wird vor jeder Anzeige gespeichert. Du kannst den Tab schließen, einen zweiten Client öffnen oder den Runner neu starten — nichts geht verloren.</p>
+              <div class="chips">
+                <button class="chip" data-vorschlag="Was ist gerade auf den Knoten los? Prüfe alle und fasse knapp zusammen.">Knoten prüfen</button>
+                <button class="chip" data-vorschlag="Lies den geteilten Zustand und sage mir, was offen ist.">Was ist offen?</button>
+                <button class="chip" data-vorschlag="Starte einen Lauf: Prüfe den Cluster und melde nur Auffälligkeiten.">Lauf starten</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="composer" id="composer">
+            <div class="composer-innen">
+              <textarea id="eingabe" rows="1" placeholder="Nachricht an Persona …  (Enter sendet, Shift+Enter neue Zeile)" aria-label="Nachricht"></textarea>
+              <div class="composer-unten">
+                <select id="sende-art" title="Wie die Nachricht wirken soll">
+                  <option value="folgen">Folgen</option>
+                  <option value="steuern">Steuern</option>
+                </select>
+                <button class="icon-btn mikro" id="mikro" title="Spracheingabe" aria-label="Spracheingabe" hidden>◉</button>
+                <span class="mini" id="mikro-status"></span>
+                <button class="senden" id="senden" title="Senden">Senden</button>
+              </div>
+            </div>
+            <div class="composer-fuss">
+              <span id="composer-hinweis">Der Lauf ist dauerhaft. Mehrere Clients sehen denselben Stand.</span>
+              <span id="token-hinweis" class="mini" hidden></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="inhalt tab-inhalt" id="inhalt-zustand" hidden>
+          <div class="karte">
+            <div class="karte-kopf">
+              <div>
+                <h2>Geteilter Zustand</h2>
+                <p class="mini">Dauerhaft in derselben SQLite-Datei. Alle Agenten dieses Geräts sehen dieselben Werte.</p>
+              </div>
+              <button class="ghost" id="zustand-neu">＋ Wert</button>
+            </div>
+            <div id="zustand-liste" class="zustand-liste"></div>
+          </div>
+        </section>
+
+        <section class="inhalt tab-inhalt" id="inhalt-aufgaben" hidden>
+          <div class="karte">
+            <div class="karte-kopf">
+              <div>
+                <h2>Läufe</h2>
+                <p class="mini">Jeder Lauf hat Phasen, ein Kindgespräch und einen gespeicherten Abschluss.</p>
+              </div>
+              <button class="primary" id="lauf-neu">＋ Lauf</button>
+            </div>
+            <div id="lauf-liste" class="lauf-liste"></div>
+          </div>
+        </section>
+
+        <section class="inhalt tab-inhalt" id="inhalt-werkzeuge" hidden>
+          <div class="karte">
+            <div class="karte-kopf">
+              <div>
+                <h2>Werkzeuge</h2>
+                <p class="mini">Der Hub ist die Werkzeugkiste. Suche zuerst, lies das Schema, dann rufe auf — das tut der Agent im Gespräch.</p>
+              </div>
+            </div>
+            <div class="suchzeile">
+              <input id="werkzeug-suche" type="search" placeholder="z. B. vorgang anlegen, cluster knoten, hauptserver …" />
+              <button class="ghost" id="werkzeug-suchen">Suchen</button>
+            </div>
+            <div class="werkzeug-layout">
+              <div id="werkzeug-liste" class="werkzeug-liste"></div>
+              <pre id="werkzeug-schema" class="schema">Wähle ein Werkzeug.</pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="inhalt tab-inhalt" id="inhalt-erweitern" hidden>
+          <div class="karte">
+            <div class="karte-kopf">
+              <div>
+                <h2>Dieses Gerät</h2>
+                <p class="mini">Der Runner lebt auf dem Gerät oder im Cluster. Ein Token schützt den Zugang von außen.</p>
+              </div>
+              <button class="ghost" id="config-neu-laden">Neu laden</button>
+            </div>
+            <div class="daten-raster" id="geraet-daten"></div>
+          </div>
+
+          <div class="karte">
+            <div class="karte-kopf">
+              <div>
+                <h2>Knoten</h2>
+                <p class="mini">Jeder Knoten muss erreichbar sein; Befehle laufen lokal oder über ssh.</p>
+              </div>
+              <button class="ghost" id="knoten-pruefen">Alle prüfen</button>
+            </div>
+            <div id="knoten-liste" class="knoten-liste"></div>
+          </div>
+
+          <div class="karte">
+            <div class="karte-kopf">
+              <div>
+                <h2>Gespräch</h2>
+                <p class="mini">Arbeitsbereich und Modell gelten ab der nächsten Nachricht.</p>
+              </div>
+            </div>
+            <div class="form-raster">
+              <label>Titel <input id="meta-titel" /></label>
+              <label>Arbeitsbereich <select id="meta-bereich"></select></label>
+              <label>Modell <select id="meta-modell"></select></label>
+              <div class="form-aktionen">
+                <button class="ghost" id="meta-speichern">Speichern</button>
+                <button class="ghost" id="aktion-leeren">Leeren</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="karte">
+            <div class="karte-kopf">
+              <div>
+                <h2>Zugang</h2>
+                <p class="mini">Der Token bleibt nur in diesem Browser. Leer lassen, wenn der Runner nur auf 127.0.0.1 lauscht.</p>
+              </div>
+            </div>
+            <div class="suchzeile">
+              <input id="token-feld" type="password" placeholder="Runner-Token" autocomplete="off" />
+              <button class="ghost" id="token-speichern">Speichern</button>
+              <button class="ghost" id="token-loeschen">Löschen</button>
+            </div>
+            <p class="mini" id="token-status"></p>
+          </div>
+
+          <div class="karte">
+            <div class="karte-kopf">
+              <div>
+                <h2>App</h2>
+                <p class="mini">Als PWA installieren, auf dem Mac als eigene App, auf Hauptserver als Chromium-Fenster.</p>
+              </div>
+            </div>
+            <div class="knopf-zeile">
+              <button class="ghost" id="pwa-installieren" hidden>Installieren</button>
+              <button class="ghost" id="aktion-export">Verlauf exportieren</button>
+              <button class="ghost" id="aktion-zurueck">Zum Hauptgespräch</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="dialog-neu" class="dialog">
+      <form method="dialog" id="form-neu">
+        <h2>Neuer Agent</h2>
+        <p class="mini">Ein eigenes Gespräch mit eigenem Verlauf. Mehrere Clients können gleichzeitig zusehen.</p>
+        <label>Titel <input name="titel" value="Neuer Agent" maxlength="120" required /></label>
+        <label>Arbeitsbereich <select name="arbeitsbereich" id="neu-bereich"></select></label>
+        <label>Modell <select name="modell" id="neu-modell"></select></label>
+        <div class="dialog-aktionen">
+          <button class="ghost" value="abbrechen" formnovalidate>Abbrechen</button>
+          <button class="primary" value="anlegen">Anlegen</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="dialog-lauf" class="dialog">
+      <form method="dialog" id="form-lauf">
+        <h2>Neuer Lauf</h2>
+        <p class="mini">Ein dauerhafter Auftrag mit Phasen. Der Lauf arbeitet in einem eigenen Kindgespräch und meldet sich im Aufgaben-Register.</p>
+        <label>Titel <input name="titel" value="Lauf" maxlength="120" required /></label>
+        <label>Auftrag <textarea name="auftrag" rows="5" maxlength="40000" required placeholder="Was soll getan werden? Mit Belegen und Rückweg."></textarea></label>
+        <label>Arbeitsbereich <select name="arbeitsbereich" id="lauf-bereich"></select></label>
+        <label>Modell <select name="modell" id="lauf-modell"></select></label>
+        <label class="zeile"><input type="checkbox" name="freigabe" /> Vor dem Abschluss Freigabe einholen</label>
+        <div class="dialog-aktionen">
+          <button class="ghost" value="abbrechen" formnovalidate>Abbrechen</button>
+          <button class="primary" value="starten">Starten</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="dialog-freigabe" class="dialog">
+      <form method="dialog" id="form-freigabe">
+        <h2>Freigabe</h2>
+        <p id="freigabe-frage" class="freigabe-frage"></p>
+        <label>Notiz (optional) <textarea name="notiz" rows="3" maxlength="600"></textarea></label>
+        <div class="dialog-aktionen">
+          <button class="ghost" value="abbrechen" formnovalidate>Abbrechen</button>
+          <button class="ghost gefahr" value="ablehnen">Ablehnen</button>
+          <button class="primary" value="erteilen">Erteilen</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="dialog-zustand" class="dialog">
+      <form method="dialog" id="form-zustand">
+        <h2 id="zustand-titel">Wert setzen</h2>
+        <label>Schlüssel <input name="schluessel" maxlength="80" required pattern="[A-Za-z0-9_.-]+" /></label>
+        <label>Wert (JSON oder Text) <textarea name="wert" rows="5" placeholder="z. B. {&quot;raum&quot;:&quot;buero&quot;} oder einfach hallo"></textarea></label>
+        <div class="dialog-aktionen">
+          <button class="ghost" value="abbrechen" formnovalidate>Abbrechen</button>
+          <button class="primary" value="speichern">Speichern</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

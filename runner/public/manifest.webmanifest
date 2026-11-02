@@ -1,0 +1,23 @@
+{
+  "name": "FYOS Agent",
+  "short_name": "FYOS Agent",
+  "description": "Ginnys dauerhafter FYOS-Agent: Gespräche, Werkzeuge, Knoten, Web, Browser, Desktop und Freigaben.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12161c",
+  "theme_color": "#12161c",
+  "scope": "/",
+  "lang": "de",
+  "dir": "auto",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities", "developer"],
+  "launch_handler": { "client_mode": "navigate-existing" }
+}

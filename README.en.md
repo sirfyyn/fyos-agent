@@ -2,6 +2,10 @@ Deutsch: [README.md](README.md)
 
 # fyos-agent
 
+> **From 0.2.0 on, the agent is the runner in [`runner/`](runner/README.en.md)**: durable on pi-durable, local or as a
+> server, image `fyos-agent/runner`. The OpenClaw mod below still works in 0.2.x but is deprecated; the migration is
+> described in the [CHANGELOG](CHANGELOG.md).
+
 The foundation of the distribution **FYOS — For Your Own Sake**: the agent behaviour as an
 OpenClaw mod, without personal content. Not a source fork: an image on top of OpenClaw's
 upstream image (pinned by digest), version-bound patches, behaviour plugins,

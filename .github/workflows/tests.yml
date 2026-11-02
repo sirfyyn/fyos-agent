@@ -41,6 +41,12 @@ jobs:
           python -m pytest tests -q
       - name: Plugin-Tests
         run: node --test "plugins/**/*.test.mjs"
+      # Der Runner (ab 0.2.0 der Agent) braucht Node >= 22.19 und eigene Pakete.
+      - name: Runner-Tests
+        working-directory: runner
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
 
   geheimnisse:
     name: Geheimnisse und Sauberkeit

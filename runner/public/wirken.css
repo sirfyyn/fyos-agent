@@ -1,0 +1,66 @@
+/* Strom der autonomen Arbeit: standardmäßig sichtbar, mit /live oder dem Schalter ausblendbar. */
+.wirken {
+  margin: 10px 16px 0;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.wirken[hidden] { display: none; }
+.wirken-kopf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--linie);
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.wirken-kopf strong { font-weight: 600; color: var(--text); }
+.wirken-kopf .mini { margin-left: auto; color: var(--text-3); }
+.wirken-kopf .punkt {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--akzent);
+  box-shadow: 0 0 0 0 var(--akzent-soft);
+  animation: wirken-puls 2.4s ease-out infinite;
+}
+.wirken.ruhig .punkt { background: var(--text-3); animation: none; }
+@keyframes wirken-puls {
+  0% { box-shadow: 0 0 0 0 var(--akzent-soft); }
+  70% { box-shadow: 0 0 0 7px rgba(85, 198, 169, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(85, 198, 169, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wirken-kopf .punkt { animation: none; }
+}
+.wirken-liste {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 168px;
+  overflow-y: auto;
+  font-size: 12.5px;
+}
+.wirken-liste li {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 8px;
+  padding: 3px 12px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.wirken-liste li:hover { background: var(--bg-3); }
+.wirken-liste li.fokus { background: var(--akzent-soft); }
+.wirken-liste .zeit { color: var(--text-3); font-family: var(--mono); font-size: 11.5px; }
+.wirken-liste .wo { color: var(--text-3); }
+.wirken-liste .typ-werkzeug .was { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
+.wirken-liste .typ-sagt .was { color: var(--text); }
+.wirken-liste .typ-eingang .was { color: var(--blau); }
+.wirken-liste .typ-freigabe .was { color: var(--warn); }
+.wirken-liste .typ-fehler .was { color: var(--gefahr); }
+.wirken-liste .typ-fertig .was, .wirken-liste .typ-schritt .was { color: var(--text-3); }
+.wirken-leer { padding: 8px 12px; color: var(--text-3); font-size: 12.5px; }
+.live-schalter[aria-pressed="true"] { color: var(--akzent); border-color: var(--akzent-2); }

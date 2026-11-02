@@ -1,0 +1,10 @@
+#!/bin/sh
+# Programm des lokalen Runners (Vertrag Version 1, apps/fyos-shell/README.md): startet das mitgelieferte Node mit starten.mjs.
+# Umgebung und Argumente der Hülle gehen unverändert durch; exec, damit SIGTERM direkt das Node trifft.
+HIER=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -x "$HIER/bin/node" ]; then
+  NODE="$HIER/bin/node"
+else
+  NODE=$(command -v node)
+fi
+exec "$NODE" "$HIER/starten.mjs" "$@"

@@ -1,0 +1,536 @@
+[
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 1,
+  "t": 1792270000000,
+  "id": "m1"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 2,
+  "t": 1792270000001,
+  "id": "m2"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 3,
+  "t": 1792270000002,
+  "id": "m3"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 4,
+  "t": 1792270000003,
+  "id": "call_1",
+  "pt": "tool",
+  "wz": "zustand_lesen",
+  "st": "running",
+  "args": {}
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 5,
+  "t": 1792270000004,
+  "id": "call_1",
+  "pt": "tool",
+  "wz": "zustand_lesen",
+  "st": "completed",
+  "ergebnis": ""
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 6,
+  "t": 1792270000005,
+  "id": "call_1"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 7,
+  "t": 1792270000006,
+  "id": "m4",
+  "pt": "text",
+  "delta": "{\n  \"version\": 1,\n  \"werte\": {},\n  \"geaendert\": null,\n  \"von\": null\n}"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 8,
+  "t": 1792270000007,
+  "id": "m4"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 9,
+  "t": 1792270000008,
+  "id": "m5",
+  "pt": "text",
+  "delta": "Hauptantwort"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 10,
+  "t": 1792270000009,
+  "id": "m5"
+ },
+ {
+  "v": "1",
+  "typ": "session.idle",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 11,
+  "t": 1792270000010
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 12,
+  "t": 1792270000011,
+  "id": "m6"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 13,
+  "t": 1792270000012,
+  "id": "m7"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 14,
+  "t": 1792270000013,
+  "id": "call_2",
+  "pt": "tool",
+  "wz": "freigabe_bitten",
+  "st": "running",
+  "args": {
+   "aktion": "Branch löschen",
+   "risiko": "high",
+   "kontext": "Aufräumen",
+   "werkzeug": "bash",
+   "befehl": "git branch -D alt"
+  }
+ },
+ {
+  "v": "1",
+  "typ": "proposal",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 15,
+  "t": 1792270000014,
+  "id": "fr-t1",
+  "aktion": "Branch löschen",
+  "risiko": "high",
+  "kontext": "Der Agent bittet um Freigabe für „Branch löschen“ (Shell-Befehl „git“). Anlass: Auftrag „Hauptgespräch“, Quelle root. Das Risiko ist hoch, weil die Aktion zerstörend wirken oder Daten überschreiben kann. Ablehnen verwirft sie ohne Wirkung; nach einer Zustimmung lässt sich das Ergebnis nur aus Sicherung oder Versionsverwaltung zurückholen.",
+  "zerstoererisch": false,
+  "optionen": [
+   "once",
+   "deny"
+  ]
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 16,
+  "t": 1792270000015,
+  "id": "call_2",
+  "pt": "tool",
+  "wz": "freigabe_bitten",
+  "st": "completed",
+  "ergebnis": ""
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 17,
+  "t": 1792270000016,
+  "id": "call_2"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 18,
+  "t": 1792270000017,
+  "id": "m8",
+  "pt": "text",
+  "delta": "Freigabe fr-t1 liegt bereit. Ich warte auf die Entscheidung; danach geht es hier weiter."
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 19,
+  "t": 1792270000018,
+  "id": "m8"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 20,
+  "t": 1792270000019,
+  "id": "m9",
+  "pt": "text",
+  "delta": "Ich warte auf die Freigabe."
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 21,
+  "t": 1792270000020,
+  "id": "m9"
+ },
+ {
+  "v": "1",
+  "typ": "session.idle",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 22,
+  "t": 1792270000021
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 23,
+  "t": 1792270000022,
+  "id": "freigabe:fr-t1",
+  "pt": "step",
+  "label": "Freigabe erteilt",
+  "phase": "finish"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 24,
+  "t": 1792270000023,
+  "id": "m10-denken",
+  "pt": "reasoning",
+  "delta": "Ich überlege kurz."
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 25,
+  "t": 1792270000024,
+  "id": "m10",
+  "pt": "text",
+  "delta": "Teil eins. "
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 26,
+  "t": 1792270000025,
+  "id": "m10",
+  "pt": "text",
+  "delta": "Teil zwei."
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 27,
+  "t": 1792270000026,
+  "id": "m10"
+ },
+ {
+  "v": "1",
+  "typ": "error",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 28,
+  "t": 1792270000027,
+  "nachricht": "Werkzeug abgebrochen",
+  "art": "tool"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 29,
+  "t": 1792270000028,
+  "id": "verdichten-7",
+  "pt": "step",
+  "label": "Verdichte den Verlauf",
+  "phase": "start"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 30,
+  "t": 1792270000029,
+  "id": "verdichten-7",
+  "pt": "step",
+  "label": "Verlauf verdichtet",
+  "phase": "finish"
+ },
+ {
+  "v": "1",
+  "typ": "ui_request",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 31,
+  "t": 1792270000030,
+  "id": "reflex:alarm-hoch:1",
+  "methode": "notify",
+  "nutzlast": {
+   "message": "Alarm hoch: Rauchmelder",
+   "notifyType": "warning",
+   "reflex": "alarm-hoch",
+   "schwere": "hoch",
+   "ein": "x"
+  }
+ },
+ {
+  "v": "1",
+  "typ": "usage",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 32,
+  "t": 1792270000031,
+  "modell": "hausmodell",
+  "tier": "normal",
+  "ctx": 1200,
+  "ctx_max": 262144
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 33,
+  "t": 1792270000032,
+  "id": "ein:1792270000000-1",
+  "pt": "step",
+  "label": "web (Besitzer): Hallo vom Web",
+  "phase": "start"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 34,
+  "t": 1792270000033,
+  "id": "m11"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 35,
+  "t": 1792270000034,
+  "id": "m12",
+  "pt": "text",
+  "delta": "eins"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 36,
+  "t": 1792270000035,
+  "id": "m12"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 37,
+  "t": 1792270000036,
+  "id": "ein:1792270000000-1",
+  "pt": "step",
+  "label": "Eingang",
+  "phase": "finish"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 38,
+  "t": 1792270000037,
+  "id": "ein:1792270000000-2",
+  "pt": "step",
+  "label": "itsm: Vorgang aktualisiert",
+  "phase": "start"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 39,
+  "t": 1792270000038,
+  "id": "m13"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 40,
+  "t": 1792270000039,
+  "id": "ein:1792270000000-2",
+  "pt": "step",
+  "label": "Eingang",
+  "phase": "finish"
+ },
+ {
+  "v": "1",
+  "typ": "session.idle",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 41,
+  "t": 1792270000040
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 42,
+  "t": 1792270000041,
+  "id": "m14",
+  "pt": "text",
+  "delta": "zwei"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 43,
+  "t": 1792270000042,
+  "id": "m14"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 44,
+  "t": 1792270000043,
+  "id": "ein:1792270000000-3",
+  "pt": "step",
+  "label": "alarm: Rauchmelder Flur",
+  "phase": "start"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 45,
+  "t": 1792270000044,
+  "id": "m15"
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 46,
+  "t": 1792270000045,
+  "id": "ein:1792270000000-3",
+  "pt": "step",
+  "label": "Eingang",
+  "phase": "finish"
+ },
+ {
+  "v": "1",
+  "typ": "session.idle",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 47,
+  "t": 1792270000046
+ },
+ {
+  "v": "1",
+  "typ": "part.updated",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 48,
+  "t": 1792270000047,
+  "id": "m16",
+  "pt": "text",
+  "delta": "drei"
+ },
+ {
+  "v": "1",
+  "typ": "part.done",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 49,
+  "t": 1792270000048,
+  "id": "m16"
+ },
+ {
+  "v": "1",
+  "typ": "session.idle",
+  "agent": "persona",
+  "sitzung": "s1",
+  "q": 50,
+  "t": 1792270000049
+ }
+]

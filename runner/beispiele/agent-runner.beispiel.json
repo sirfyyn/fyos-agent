@@ -1,0 +1,52 @@
+{
+  "hub": "http://127.0.0.1:8080",
+  "agent": "agent",
+  "hub_token_datei": "~/.fyos/runner/hub.token",
+  "takt": {
+    "an": false
+  },
+  "pi_durable": {
+    "host": "127.0.0.1",
+    "port": 18438,
+    "device": {
+      "id": "server",
+      "name": "Server",
+      "kind": "linux"
+    },
+    "storage": "~/.fyos/runner/fyos.sqlite",
+    "security": {
+      "tokenDatei": "~/.fyos/runner/token",
+      "allowedOrigins": []
+    },
+    "model": {
+      "provider": "lokal",
+      "baseUrl": "http://127.0.0.1:8081/v1",
+      "apiKey": "lokal",
+      "default": "mein-modell",
+      "max": "mein-modell"
+    },
+    "nodes": [
+      {
+        "id": "server2",
+        "titel": "Zweiter Server",
+        "art": "linux",
+        "host": "192.0.2.20",
+        "user": "agent",
+        "port": 22,
+        "notiz": "Beispiel"
+      }
+    ],
+    "arbeitsschleife": {
+      "an": false
+    },
+    "gedaechtnis": {
+      "an": false
+    },
+    "browser": {
+      "enabled": false
+    },
+    "desktop": {
+      "enabled": false
+    }
+  }
+}
